@@ -187,7 +187,7 @@ const ok=(a||[]).filter(o=>o&&o.q&&o.c&&Array.isArray(o.w)&&o.w.length>=3&&o.e).
 if(!ok.length)return 0;S.fresh=(news?[...ok,...S.fresh]:[...S.fresh,...ok]).slice(0,60);S.news='';save();return ok.length}catch(e){return 0}}
 async function genSb(){S.fresh=S.fresh||[];const p=PR(),news=(S.news||'').trim(),st=Object.entries(S.stats||{}).filter(([k,v])=>v.r+v.w>=5).map(([k,v])=>[k,v.r/(v.r+v.w)]);
 const body={grade:p.grade,age:p.age,news:news.slice(0,400),chapters:(S.chapters||'').slice(0,200),weak:st.filter(x=>x[1]<.5).map(x=>x[0]),strong:st.filter(x=>x[1]>.85).map(x=>x[0]),recent:(S.recent||[]).slice(-20)};
-let a=null;try{const r=await Promise.race([sb.functions.invoke('make-questions',{body}),new Promise((_,j)=>setTimeout(()=>j(0),90000))]);a=r&&r.data&&r.data.items}catch(e){}
+let a=null;window.LASTERR='';try{const r=await Promise.race([sb.functions.invoke('make-questions',{body}),new Promise((_,j)=>setTimeout(()=>j('timed out after 90 seconds'),90000))]);a=r&&r.data&&r.data.items;if(r&&r.error)window.LASTERR='function error '+((r.error.context&&r.error.context.status)||r.error.message);else if(r&&r.data&&r.data.error)window.LASTERR=String(r.data.error).slice(0,160)}catch(e){window.LASTERR=String(e).slice(0,160)}
 if(!Array.isArray(a)||!a.length){const q=await sb.from('questions').select('q,c,w,e,cat').eq('grade',p.grade).order('created_at',{ascending:false}).limit(80);a=(q.data||[]).filter(o=>!(S.recent||[]).includes(o.q)).slice(0,14)}
 const ok=(a||[]).filter(o=>o&&o.q&&o.c&&Array.isArray(o.w)&&o.w.length>=3&&o.e).map(o=>[String(o.q),String(o.c),o.w.slice(0,3).map(String),String(o.e),String(o.cat||'\u2728 Fresh')]);
 if(!ok.length)return 0;S.fresh=(news?[...ok,...S.fresh]:[...S.fresh,...ok]).slice(0,60);S.news='';save();return ok.length}
@@ -246,7 +246,7 @@ function home(){VIEW='h';tok++;const d=S.done[key]||{},n=Object.keys(d).length;
  <p class="foot">${(S.missed||[]).length} to revisit later. <button id="pv">Parent view</button><br>Levels adjust by themselves: Maths ${L('math')}, Logic ${L('logic')}, Memory ${L('mem')}.<br><button id="rs">Reset all progress</button></p>`;
  app.querySelectorAll('.act').forEach(b=>b.onclick=()=>ACTS.find(a=>a.id==b.dataset.id).run());
  $('#rs').onclick=()=>{if(confirm('Reset all progress?')){S={streak:0,last:'',stars:0,lv:{},done:{}};save();home()}};
- $('#sw').onclick=picker;$('#pf').onclick=profile;$('#pv').onclick=dash;$('#gb').onclick=async()=>{S.news=$('#nw').value;S.chapters=$('#ch').value;save();$('#gs').textContent='Creating fresh questions…';const n=await gen();$('#gs').textContent=n?(S.fresh.length+' fresh questions ready ✨'):'Could not create new questions right now. The built-in questions still work.'};
+ $('#sw').onclick=picker;$('#pf').onclick=profile;$('#pv').onclick=dash;$('#gb').onclick=async()=>{S.news=$('#nw').value;S.chapters=$('#ch').value;save();$('#gs').textContent='Creating fresh questions…';const n=await gen();$('#gs').textContent=n?(S.fresh.length+' fresh questions ready ✨'):'Could not create new questions right now'+(window.LASTERR?' ('+window.LASTERR+')':'')+'. The built-in questions still work.'};
  window.scrollTo(0,0)}
 
 function shell(t,body){VIEW='q';app.innerHTML=`<button class="back" id="bk">← Back</button><div class="panel"><h2>${t}</h2>${body}</div>`;$('#bk').onclick=home}
