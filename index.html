@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#2a5bd7"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Brain Quest"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script><meta name="theme-color" content="#2a5bd7"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Brain Quest"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Brain Quest Daily</title>
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#fdf6e3;--card:#fff;--ink:#1d2b53;--mut:#5f6b8a;--acc:#2a5bd7;--acc2:#ffb703;--ok:#168a4d;--bad:#d1363b;--line:#e6dcc0}
@@ -34,6 +34,7 @@ button.main{background:var(--acc);border-color:var(--acc);color:#fff;font-weight
 button.back{font-size:15px;padding:6px 12px;margin-bottom:8px}
 a.lnk{display:inline-block;margin-top:10px;padding:10px 14px;border:2px solid var(--acc);border-radius:14px;color:var(--acc);text-decoration:none;font-weight:700}
 .mt{margin-top:10px}
+input.in{width:100%;font:inherit;padding:10px;margin:6px 0;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
 button.o.right{background:var(--ok);border-color:var(--ok);color:#fff}
 button.o.wrong{background:var(--bad);border-color:var(--bad);color:#fff}
 .fb{min-height:26px;margin-top:10px;color:var(--mut)}
@@ -55,9 +56,10 @@ const yest=new Date(Date.now()-864e5).toLocaleDateString('en-CA');
 let S={streak:0,last:'',stars:0,lv:{},done:{}};
 try{const x=localStorage.getItem('bqd');if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
 let DB=null,tm,VIEW='h',WP=null;
+const sb=(window.SB_URL&&window.supabase)?supabase.createClient(window.SB_URL,window.SB_KEY):null;let USER=null;
 const G=()=>S.goal||(S.goal={n:100,t:'A trip to the library'});
 let PF=[],CUR=null,unsub=null;
-const save=()=>{if(!CUR)return;S.upd=Date.now();const id=CUR,s=JSON.stringify(S);LS('bqd_'+id,s);clearTimeout(tm);tm=setTimeout(()=>{if(DB)DB.doc('progress/'+id).set({s}).catch(()=>{})},1500)};
+const save=()=>{if(!CUR)return;S.upd=Date.now();const id=CUR,s=JSON.stringify(S);LS('bqd_'+id,s);clearTimeout(tm);tm=setTimeout(()=>{if(sb&&USER)sb.from('children').update({data:JSON.parse(s)}).eq('id',id).then(()=>{});if(DB)DB.doc('progress/'+id).set({s}).catch(()=>{})},1500)};
 let seed=+key.replace(/-/g,'');
 const rng=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
 const r=(a,b)=>Math.floor(rng()*(b-a+1))+a;
@@ -174,7 +176,7 @@ const cats=n=>[...shuf(CATS),...shuf(CATS)].slice(0,n);
 const esc=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function nextNew(){S.fresh=S.fresh||[];if(S.fresh.length){const x=S.fresh.shift();S.recent=[...(S.recent||[]),x[0]].slice(-40);return{x:[x[0],x[1],x[2],x[3]],cat:x[4]}}return oneQ(CATS[Math.floor(Math.random()*CATS.length)])}
 function retries(k){S.missed=S.missed||[];const t=Date.now();return S.missed.filter(m=>m.due<=t).slice(0,k).map(m=>({x:m.x,cat:m.cat,retry:true}))}
-function track(it,ok){S.missed=S.missed||[];const i=S.missed.findIndex(m=>m.x[0]==it.x[0]);if(ok){if(i>=0&&it.retry)S.missed.splice(i,1)}else{const d=Date.now()+20*36e5;if(i>=0)S.missed[i].due=d;else S.missed.push({x:it.x,cat:(it.cat||'').replace(/ 🔁.*/,''),due:d});S.missed=S.missed.slice(-60)}}
+function track(it,ok){S.missed=S.missed||[];const i=S.missed.findIndex(m=>m.x[0]==it.x[0]);if(ok){if(i>=0&&it.retry){S.missed.splice(i,1);S.fixed=(S.fixed||0)+1}}else{const d=Date.now()+20*36e5;if(i>=0)S.missed[i].due=d;else S.missed.push({x:it.x,cat:(it.cat||'').replace(/ 🔁.*/,''),due:d});S.missed=S.missed.slice(-60)}}
 const toQ=o=>{const m=mk(o.x[0],o.x[1],o.x[2],o.x[3]);m.cat=o.cat+(o.retry?' 🔁 try again':'');m.x=o.x;m.retry=o.retry;return m};
 const mixQ=n=>{const rt=retries(Math.round(n*.25));const nw=Array.from({length:n-rt.length},nextNew);return shuf([...rt,...nw]).map(toQ)};
 const fibQ=n=>Array.from({length:n},nextNew).map(o=>{const x=o.x,t=Math.random()<.5,s=t?x[1]:shuf(x[2])[0];return{q:x[0]+'<br><b>Is it: '+s+'?</b>',o:['✅ Fact','❌ Fib'],a:t?0:1,e:'The answer is '+x[1]+'. '+x[3],cat:o.cat,x}});
@@ -228,7 +230,7 @@ const total=ACTS.reduce((s,a)=>s+a.m,0);
 let tok=0;
 
 function home(){VIEW='h';tok++;const d=S.done[key]||{},n=Object.keys(d).length;
- app.innerHTML=`<button class="back" id="sw">⇄ Switch child</button><h1>${PR().emoji} Hi ${esc(PR().name)}!</h1><p class="sub">About ${total} minutes. Topics are a surprise every day. Do the rounds in any order.</p>
+ app.innerHTML=`<button class="back" id="sw">⇄ Switch child</button> <button class="back" id="pf">👤 Profile</button><h1>${PR().emoji} Hi ${esc(PR().name)}!</h1><p class="sub">About ${total} minutes. Topics are a surprise every day. Do the rounds in any order.</p>
  <div class="stats"><div class="stat"><b>🔥 ${S.streak}</b><span>day streak</span></div><div class="stat"><b>⭐ ${S.stars}</b><span>stars</span></div><div class="stat"><b>${n}/${ACTS.length}</b><span>done today</span></div></div>
  <div class="bar"><i style="width:${n/ACTS.length*100}%"></i></div>
  <p class="sub">🎁 ${esc(G().t)}: ⭐ ${S.stars}/${G().n}${S.stars>=G().n?' 🎉 Earned! Tell a parent.':''}</p>
@@ -238,7 +240,7 @@ function home(){VIEW='h';tok++;const d=S.done[key]||{},n=Object.keys(d).length;
  <p class="foot">${(S.missed||[]).length} to revisit later. <button id="pv">Parent view</button><br>Levels adjust by themselves: Maths ${L('math')}, Logic ${L('logic')}, Memory ${L('mem')}.<br><button id="rs">Reset all progress</button></p>`;
  app.querySelectorAll('.act').forEach(b=>b.onclick=()=>ACTS.find(a=>a.id==b.dataset.id).run());
  $('#rs').onclick=()=>{if(confirm('Reset all progress?')){S={streak:0,last:'',stars:0,lv:{},done:{}};save();home()}};
- $('#sw').onclick=picker;$('#pv').onclick=dash;$('#gb').onclick=async()=>{S.news=$('#nw').value;S.chapters=$('#ch').value;save();$('#gs').textContent='Creating fresh questions…';const n=await gen();$('#gs').textContent=n?(S.fresh.length+' fresh questions ready ✨'):'Could not reach Claude right now. The built-in questions still work.'};
+ $('#sw').onclick=picker;$('#pf').onclick=profile;$('#pv').onclick=dash;$('#gb').onclick=async()=>{S.news=$('#nw').value;S.chapters=$('#ch').value;save();$('#gs').textContent='Creating fresh questions…';const n=await gen();$('#gs').textContent=n?(S.fresh.length+' fresh questions ready ✨'):'Could not reach Claude right now. The built-in questions still work.'};
  window.scrollTo(0,0)}
 
 function shell(t,body){VIEW='q';app.innerHTML=`<button class="back" id="bk">← Back</button><div class="panel"><h2>${t}</h2>${body}</div>`;$('#bk').onclick=home}
@@ -254,9 +256,9 @@ function quiz(id,items,title,lv){let i=0,sc=0;
   $('#nx .main').onclick=()=>{i++;show()};const rp=$('#rp');if(rp)rp.onclick=()=>{S.bad=[...(S.bad||[]),it.x[0]].slice(-100);S.missed=(S.missed||[]).filter(m=>m.x[0]!=it.x[0]);rp.textContent='Thanks! Removed.';rp.disabled=true;save()}})})()}
 
 function finish(id,sc,tot,lv,title){if(id=='read'&&WP){const w=WP;WP=null;shell('Write it down ✍️','<p class="q">'+esc(w)+'</p><p>Write on paper, or say it out loud to a parent.</p><button class="main" id="wd">Done writing ✍️</button>');$('#wd').onclick=()=>finish(id,sc,tot,lv,title);return}S.done[key]=S.done[key]||{};
- if(S.done[key][id]===undefined)S.stars+=sc;
- S.done[key][id]=sc;let msg='';
- if(lv){const l=L(lv);if(sc==tot&&l<4){S.lv[lv]=l+1;msg='Level up! The next one will be harder. 🚀'}else if(sc<=tot/2&&l>1){S.lv[lv]=l-1;msg='We will make the next one a little easier. Practice makes it click.'}}
+ if(id!='rev'&&S.done[key][id]===undefined)S.stars+=sc;
+ if(id!='rev')S.done[key][id]=sc;let msg='';
+ if(lv&&!S.manual){const l=L(lv);if(sc==tot&&l<4){S.lv[lv]=l+1;msg='Level up! The next one will be harder. 🚀'}else if(sc<=tot/2&&l>1){S.lv[lv]=l-1;msg='We will make the next one a little easier. Practice makes it click.'}}
  if(Object.keys(S.done[key]).length==ACTS.length&&S.last!==key){S.streak=S.last===yest?S.streak+1:1;S.last=key;msg+=' 🔥 Streak: '+S.streak+' days!'}
  save();
  shell(title||'Done',`<p class="big" style="letter-spacing:0">${sc}/${tot} ⭐</p><p>${sc==tot?'Perfect! Legend! 🏆':sc>=tot/2?'Great effort! Nice thinking! 🌟':'Good try! Every mistake grows your brain. 💪'} ${msg}</p>${id=='mix3'?'<p><b>Family talk:</b> '+TALK[DAY]+'</p>':''}<button class="main" id="hm">Back to today</button>`);
@@ -284,12 +286,40 @@ function loadPF(){try{PF=JSON.parse(LS('bqp')||'[]')}catch(e){PF=[]}const old=LS
 function picker(){VIEW='p';tok++;app.innerHTML=`<h1>Who is learning today?</h1><p class='sub'>Tap a name to start. Each child has their own progress.</p>${PF.map(p=>`<button class='act' data-id='${p.id}'><span class='ic'>${p.emoji}</span><span><b>${esc(p.name)}</b><small>Grade ${p.grade}</small></span></button><button class='back' data-ed='${p.id}' style='margin:-4px 0 10px'>✏️ Edit details</button>`).join('')}<button class='act' id='ad'><span class='ic'>➕</span><span><b>Add a child</b><small>Name, grade and avatar</small></span></button>`;
 app.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>selectChild(b.dataset.id));app.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>addForm(b.dataset.ed));$('#ad').onclick=()=>addForm()}
 function addForm(eid){VIEW='p';const P0=PF.find(x=>x.id==eid),E=['🦁','🐯','🦊','🐼','🚀','⚽','🦄','🐬'];let em=P0?P0.emoji:E[0];
-app.innerHTML=`<button class='back' id='bk'>← Back</button><h1>${P0?'Edit child':'Add a child'}</h1><input id='an' value='${P0?esc(P0.name).replace(/'/g,'&#39;'):''}' placeholder='Name' maxlength='20' style='width:100%;font:inherit;padding:10px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)'><p class='sub'>Grade (CBSE)</p><select id='ag' style='font:inherit;padding:10px;border-radius:12px;width:100%'>${[1,2,3,4,5,6,7,8].map(g=>`<option ${g==(P0?P0.grade:3)?'selected':''}>${g}</option>`).join('')}</select><p class='sub'>Pick an avatar</p><div class='grid' id='ae'>${E.map(e=>`<button class='o ${e==em?'sel':''}'>${e}</button>`).join('')}</div><button class='main' id='as'>Save</button>${P0?`<button class='back' id='rm' style='margin-top:12px'>Remove this child</button>`:''}`;
+app.innerHTML=`<button class='back' id='bk'>← Back</button><h1>${P0?'Edit child':'Add a child'}</h1><input id='an' value='${P0?esc(P0.name).replace(/'/g,'&#39;'):''}' placeholder='Name' maxlength='20' style='width:100%;font:inherit;padding:10px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)'><p class='sub'>Grade (CBSE)</p><select id='ag' style='font:inherit;padding:10px;border-radius:12px;width:100%'>${[1,2,3,4,5,6,7,8].map(g=>`<option ${g==(P0?P0.grade:3)?'selected':''}>${g}</option>`).join('')}</select><p class='sub'>Date of birth</p><input id='ad2' type='date' class='in' value='${P0&&P0.dob?P0.dob:''}'><p class='sub'>Pick an avatar</p><div class='grid' id='ae'>${E.map(e=>`<button class='o ${e==em?'sel':''}'>${e}</button>`).join('')}</div><button class='main' id='as'>Save</button>${P0?`<button class='back' id='rm' style='margin-top:12px'>Remove this child</button>`:''}`;
 $('#bk').onclick=picker;app.querySelectorAll('#ae button').forEach(b=>b.onclick=()=>{em=b.textContent;app.querySelectorAll('#ae button').forEach(x=>x.classList.toggle('sel',x==b))});
-$('#as').onclick=()=>{const n=$('#an').value.trim();if(!n){$('#an').focus();return}const g=+$('#ag').value;if(P0)Object.assign(P0,{name:n,emoji:em,grade:g,age:g+6});else PF.push({id:'c'+Date.now().toString(36),name:n,emoji:em,grade:g,age:g+6});savePF();picker()};const rm=$('#rm');if(rm)rm.onclick=()=>{if(rm.dataset.c){PF=PF.filter(x=>x.id!=eid);LS('bqd_'+eid,'{}');savePF();picker()}else{rm.dataset.c=1;rm.textContent='Tap again to remove permanently'}}}
-function selectChild(id){CUR=id;LS('bqc',id);let r={};try{r=JSON.parse(LS('bqd_'+id)||'{}')}catch(e){}S=Object.assign({streak:0,last:'',stars:0,lv:{},done:{}},r);watch();home()}
+$('#as').onclick=async()=>{const n=$('#an').value.trim();if(!n){$('#an').focus();return}const g=+$('#ag').value,dob=$('#ad2').value||null,ob={name:n,emoji:em,grade:g,age:g+6,dob};
+if(P0){Object.assign(P0,ob);if(sb&&USER)await sb.from('children').update({name:n,emoji:em,grade:g,dob}).eq('id',eid)}
+else if(sb&&USER){const r=await sb.from('children').insert({name:n,emoji:em,grade:g,dob}).select().single();if(r.error){alert(r.error.message);return}PF.push({id:r.data.id,...ob})}
+else PF.push({id:'c'+Date.now().toString(36),...ob});
+savePF();picker()};const rm=$('#rm');if(rm)rm.onclick=()=>{if(rm.dataset.c){PF=PF.filter(x=>x.id!=eid);LS('bqd_'+eid,'{}');if(sb&&USER)sb.from('children').delete().eq('id',eid).then(()=>{});savePF();picker()}else{rm.dataset.c=1;rm.textContent='Tap again to remove permanently'}}}
+function selectChild(id){CUR=id;LS('bqc',id);let r={};try{r=JSON.parse(LS('bqd_'+id)||'{}')}catch(e){}const pf=PF.find(p=>p.id==id);if(pf&&pf.remote&&(pf.remote.upd||0)>(r.upd||0))r=pf.remote;S=Object.assign({streak:0,last:'',stars:0,lv:{},done:{}},r);watch();home()}
 function watch(){if(unsub){try{unsub()}catch(e){}unsub=null}if(!DB||!CUR)return;const id=CUR;unsub=DB.doc('progress/'+id).onSnapshot(sn=>{if(id!=CUR)return;if(!sn.exists){save();return}let r;try{r=JSON.parse(sn.data().s)}catch(e){return}if((r.upd||0)>(S.upd||0)){S=Object.assign({streak:0,last:'',stars:0,lv:{},done:{}},r);LS('bqd_'+id,JSON.stringify(S));if(VIEW=='d')dash();else if(VIEW=='h')home()}else if((r.upd||0)<(S.upd||0))save()},()=>{})}
-loadPF();picker();
+loadPF();
+const BADGES=[['🌱','First steps',()=>Object.keys(S.done||{}).length>=1],['🔥','3-day streak',()=>(S.streak||0)>=3],['🔥','7-day streak',()=>(S.streak||0)>=7],['⭐','100 stars',()=>(S.stars||0)>=100],['🏆','500 stars',()=>(S.stars||0)>=500],['🧠','Memory master',()=>L('mem')>=4],['🥷','Number ninja',()=>L('math')>=3],['🧩','Puzzle pro',()=>L('logic')>=3],['🌍','Topic explorer',()=>Object.keys(S.stats||{}).length>=5],['💪','Comeback kid',()=>(S.fixed||0)>=5]];
+function profile(){VIEW='f';const p=PR(),u=(USER&&USER.user_metadata)||{},age=p.dob?Math.floor((Date.now()-new Date(p.dob))/315576e5):p.age;
+S.ach=S.ach||{};BADGES.forEach(b=>{if(b[2]()&&!S.ach[b[1]])S.ach[b[1]]=key});save();
+const lv=(k,t)=>`<p style='display:flex;align-items:center;gap:8px;margin:8px 0'><b style='flex:1'>${t}</b><button class='back' data-lv='${k}' data-d='-1'>−</button> Level ${L(k)} <button class='back' data-lv='${k}' data-d='1'>+</button></p>`;
+app.innerHTML=`<button class='back' id='bk'>← Back</button><h1>${p.emoji} ${esc(p.name)}</h1><p class='sub'>Grade ${p.grade}${age?' · Age '+age:''}</p>
+<div class='stats'><div class='stat'><b>🔥 ${S.streak||0}</b><span>streak</span></div><div class='stat'><b>⭐ ${S.stars||0}</b><span>stars</span></div><div class='stat'><b>${Object.keys(S.log||{}).length}</b><span>days played</span></div></div>
+<div class='panel'><b>🏅 Achievements</b>${BADGES.map(b=>S.ach[b[1]]?`<p style='margin:6px 0'>${b[0]} ${b[1]} <small>(${S.ach[b[1]]})</small></p>`:`<p style='margin:6px 0;opacity:.5'>🔒 ${b[1]}</p>`).join('')}</div>
+<div class='panel mt'><b>Difficulty</b><p><label><input type='checkbox' id='mn' ${S.manual?'checked':''}> Keep my levels (turn off auto-adjust)</label></p>${lv('math','Maths')}${lv('logic','Puzzles')}${lv('mem','Memory')}<small>Changes apply to the next round straight away.</small></div>
+<button class='main' id='rv'>🔁 Review mistakes (${(S.missed||[]).length})</button>
+${USER?`<div class='panel mt'><b>Parent account</b><p>${esc(u.name||'')}<br>${esc(USER.email)}<br>${esc(u.phone||'')}</p><button class='back' id='lo'>Log out</button></div>`:''}`;
+$('#bk').onclick=home;$('#rv').onclick=review;
+$('#mn').onchange=e=>{S.manual=e.target.checked;save()};
+app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const k=b.dataset.lv;S.lv[k]=Math.min(4,Math.max(1,L(k)+(+b.dataset.d)));S.manual=true;save();profile()});
+const lo=$('#lo');if(lo)lo.onclick=async()=>{await sb.auth.signOut();USER=null;PF=[];CUR=null;authScreen('in')}}
+function review(){VIEW='r';const m=S.missed||[];app.innerHTML=`<button class='back' id='bk'>← Back</button><h2>Review mistakes</h2>${m.length?m.map(x=>`<div class='panel mt'><small>${esc(x.cat||'')}</small><p style='margin:4px 0'>${esc(x.x[0].replace(/<[^>]*>/g,' '))}</p><b style='color:var(--ok)'>${esc(x.x[1])}</b><br><small>${esc(x.x[3]||'')}</small></div>`).join(''):'<p class="sub">No mistakes waiting. 🎉</p>'}${m.length?`<button class='main' id='pr'>Practise these now</button>`:''}`;
+$('#bk').onclick=profile;if(m.length)$('#pr').onclick=()=>quiz('rev',m.slice(0,8).map(x=>toQ({x:x.x,cat:x.cat,retry:true})),'Review mistakes')}
+function authScreen(mode){VIEW='a';const su=mode=='up';
+app.innerHTML=`<h1>🧠 Brain Quest</h1><p class='sub'>${su?'Create a parent account':'Welcome back! Log in to continue.'}</p>${su?`<input class='in' id='pn' placeholder='Parent name'><p class='sub' style='margin:4px 0'>Date of birth</p><input class='in' id='pd' type='date'><input class='in' id='pp' type='tel' placeholder='Contact number'>`:''}<input class='in' id='pe' type='email' placeholder='Email'><input class='in' id='pw' type='password' placeholder='Password (6+ characters)'><button class='main' id='go'>${su?'Create account':'Log in'}</button><p class='fb' id='ae'></p><button class='back' id='tg'>${su?'I already have an account':'New here? Create an account'}</button>`;
+$('#tg').onclick=()=>authScreen(su?'in':'up');
+$('#go').onclick=async()=>{const m=$('#ae');m.textContent='Please wait…';const e=$('#pe').value.trim(),p=$('#pw').value;
+const r=su?await sb.auth.signUp({email:e,password:p,options:{data:{name:$('#pn').value.trim(),dob:$('#pd').value,phone:$('#pp').value.trim()}}}):await sb.auth.signInWithPassword({email:e,password:p});
+if(r.error){m.textContent=r.error.message;return}if(!r.data.session){m.textContent='Check your email to confirm your address, then log in.';return}USER=r.data.user;afterLogin()}}
+async function afterLogin(){const r=await sb.from('children').select('*').order('created_at');PF=(r.data||[]).map(c=>({id:c.id,name:c.name,emoji:c.emoji||'🦁',grade:c.grade||3,age:(c.grade||3)+6,dob:c.dob,remote:c.data}));LS('bqp',JSON.stringify(PF));picker()}
+if(sb)sb.auth.getSession().then(r=>{if(r.data.session){USER=r.data.session.user;afterLogin()}else authScreen('in')});else picker();
 (async()=>{try{if(!window.claude)return;const d=await claude.use('db');if(!d)return;DB=d;watch();
 d.doc('profiles/list').onSnapshot(async sn=>{let r=null;if(sn.exists){try{r=JSON.parse(sn.data().s)}catch(e){}}
 if(r&&r.length){const m=[...r];PF.forEach(p=>{if(!m.find(x=>x.id==p.id))m.push(p)});const grew=m.length>r.length;PF=m;LS('bqp',JSON.stringify(PF));if(grew)savePF()}
