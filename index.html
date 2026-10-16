@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest"><script src="config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script><meta name="theme-color" content="#2a5bd7"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Brain Quest"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brain Quest Daily</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#fdf6e3;--card:#fff;--ink:#1d2b53;--mut:#5f6b8a;--acc:#2a5bd7;--acc2:#ffb703;--ok:#168a4d;--bad:#d1363b;--line:#e6dcc0}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1a38;--card:#192650;--ink:#f3f1e8;--mut:#a9b4d6;--acc:#7da2ff;--acc2:#ffc933;--ok:#4cd68c;--bad:#ff7d82;--line:#2c3b6e}}
+:root[data-theme="dark"]{--bg:#0f1a38;--card:#192650;--ink:#f3f1e8;--mut:#a9b4d6;--acc:#7da2ff;--acc2:#ffc933;--ok:#4cd68c;--bad:#ff7d82;--line:#2c3b6e}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Baloo 2","Trebuchet MS",system-ui,sans-serif;font-size:17px;line-height:1.45}
+#app{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:30px;margin:4px 0 0;line-height:1.1}
+h2{font-size:24px;margin:8px 0}
+.sub{color:var(--mut);margin:2px 0 12px}
+.stats{display:flex;gap:8px;margin:10px 0}
+.stat{flex:1;background:var(--card);border:2px solid var(--line);border-radius:16px;padding:8px 10px;text-align:center}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:13px;color:var(--mut)}
+.bar{height:14px;background:var(--line);border-radius:9px;overflow:hidden;margin:6px 0 14px}
+.bar i{display:block;height:100%;background:var(--acc2);transition:width .5s}
+.act{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);color:var(--ink);border:2px solid var(--line);border-radius:18px;padding:12px;margin:0 0 10px;font:inherit;cursor:pointer}
+.act:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.act.done{border-color:var(--ok)}
+.ic{font-size:30px;width:48px;height:48px;display:grid;place-items:center;background:var(--bg);border-radius:14px;flex:none}
+.act b{display:block}.act small{color:var(--mut)}
+.tag{margin-left:auto;font-size:14px;color:var(--mut);white-space:nowrap}
+.done .tag{color:var(--ok);font-weight:700}
+.panel{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:16px}
+.q{font-size:22px;font-weight:700;margin:8px 0 14px}
+.opts{display:grid;gap:10px}
+button.o,button.main,button.back{font:inherit;border-radius:14px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:12px;cursor:pointer;font-size:19px}
+button.main{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700;margin-top:12px;width:100%}
+button.back{font-size:15px;padding:6px 12px;margin-bottom:8px}
+a.lnk{display:inline-block;margin-top:10px;padding:10px 14px;border:2px solid var(--acc);border-radius:14px;color:var(--acc);text-decoration:none;font-weight:700}
+.mt{margin-top:10px}
+input.in{width:100%;font:inherit;padding:10px;margin:6px 0;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)}
+button.o.right{background:var(--ok);border-color:var(--ok);color:#fff}
+button.o.wrong{background:var(--bad);border-color:var(--bad);color:#fff}
+.fb{min-height:26px;margin-top:10px;color:var(--mut)}
+.big{font-size:44px;text-align:center;letter-spacing:6px;margin:14px 0;word-break:break-all}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grid button{font-size:32px;padding:10px 0}
+.grid button.sel{background:var(--acc2);border-color:var(--acc2)}
+.prog{color:var(--mut);font-size:14px;margin:0}
+.ar{font-size:34px;text-align:center;direction:rtl}
+.foot{margin-top:18px;font-size:13px;color:var(--mut);text-align:center}
+.foot button{font:inherit;font-size:13px;background:none;border:0;color:var(--mut);text-decoration:underline;cursor:pointer}
+@media(prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style></head>
+<body><div id="app"></div>
+<script>
+const $=s=>document.querySelector(s), app=$('#app');
+const key=new Date().toLocaleDateString('en-CA');
+const yest=new Date(Date.now()-864e5).toLocaleDateString('en-CA');
+let S={streak:0,last:'',stars:0,lv:{},done:{}};
+try{const x=localStorage.getItem('bqd');if(x)S=Object.assign(S,JSON.parse(x))}catch(e){}
+let DB=null,tm,VIEW='h',WP=null;
+const sb=(window.SB_URL&&window.supabase)?supabase.createClient(window.SB_URL,window.SB_KEY):null;let USER=null;
+const G=()=>S.goal||(S.goal={n:100,t:'A trip to the library'});
+let PF=[],CUR=null,unsub=null;
+const save=()=>{if(!CUR)return;S.upd=Date.now();const id=CUR,s=JSON.stringify(S);LS('bqd_'+id,s);clearTimeout(tm);tm=setTimeout(()=>{if(sb&&USER)sb.from('children').update({data:JSON.parse(s)}).eq('id',id).then(()=>{});if(DB)DB.doc('progress/'+id).set({s}).catch(()=>{})},1500)};
+let seed=+key.replace(/-/g,'');
+const rng=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const r=(a,b)=>Math.floor(rng()*(b-a+1))+a;
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const pick=(a,n)=>{const c=a.slice(),o=[];while(o.length<n&&c.length)o.push(c.splice(Math.floor(rng()*c.length),1)[0]);return o};
+const L=k=>S.lv[k]||1;
+const mk=(q,c,w,e)=>{const o=shuf([c,...w]);return{q,o,a:o.indexOf(c),e}};
+
+/* ---------- content ---------- */
+function mathQ(l){let q,c,a,b;const k=r(0,2);
+ if(l==1){a=r(10,50);b=r(5,40);if(k==0){q=`${a} + ${b} = ?`;c=a+b}else if(k==1){q=`${a+b} − ${b} = ?`;c=a}else{q=`${a} + ${b} + 10 = ?`;c=a+b+10}}
+ else if(l==2){if(k==0){a=r(35,99);b=r(12,34);q=`${a} − ${b} = ?`;c=a-b}else if(k==1){a=r(2,10);b=[2,5,10][r(0,2)];q=`${a} × ${b} = ?`;c=a*b}else{a=r(25,60);b=r(25,39);q=`${a} + ${b} = ?`;c=a+b}}
+ else if(l==3){a=r(3,10);b=r(3,10);if(k==0){q=`${a} × ${b} = ?`;c=a*b}else if(k==1){q=`${a*b} ÷ ${b} = ?`;c=a}else{q=`${a} groups of ${b} sweets. How many sweets in all?`;c=a*b}}
+ else{a=r(3,9);b=r(3,9);const d=r(2,20);if(k==0){q=`${a} × ${b} + ${d} = ?`;c=a*b+d}else if(k==1){q=`? × ${b} = ${a*b}`;c=a}else{const h=r(10,60)*2;q=`Half of ${h} is ?`;c=h/2}}
+ const w=shuf([c+1,c-1,c+10,c-10,c+2,c-2].filter(x=>x>=0&&x!=c)).slice(0,3);
+ return mk(q,c,w,`Answer: ${c}`)}
+const LOGIC=[ // d, q, correct, wrongs, explain
+[1,'2, 4, 6, 8, ?','10',['9','12','11'],'Add 2 each time.'],
+[1,'5, 10, 15, 20, ?','25',['30','24','22'],'Add 5 each time.'],
+[1,'Odd one out: Apple, Banana, Carrot, Mango','Carrot',['Apple','Banana','Mango'],'Carrot is a vegetable. The rest are fruits.'],
+[1,'Odd one out: Cow, Lion, Goat, Sheep','Lion',['Cow','Goat','Sheep'],'A lion is wild. The others are farm animals.'],
+[1,'I have hands but I cannot clap. What am I?','A clock',['A robot','A tree','A glove'],'A clock has hands that point to the time.'],
+[1,'🔴🔵🔵🔴🔵🔵🔴 ?','🔵',['🔴','🟢','🟡'],'The pattern is red, blue, blue and repeats.'],
+[1,'Monday, Wednesday, Friday, ?','Sunday',['Saturday','Thursday','Tuesday'],'We skip one day each time.'],
+[2,'1, 3, 6, 10, ?','15',['14','13','16'],'Add 1, then 2, then 3, then 4, then 5.'],
+[2,'3, 6, 12, 24, ?','48',['36','30','28'],'Double each time.'],
+[2,'Ali is taller than Sara. Sara is taller than Omar. Who is the shortest?','Omar',['Ali','Sara','They are equal'],'Ali > Sara > Omar.'],
+[2,'A, C, E, G, ?','I',['H','J','F'],'We skip one letter each time.'],
+[2,'Which is heavier: 1 kg of cotton or 1 kg of iron?','Same weight',['Cotton','Iron','Cannot say'],'Both are 1 kg!'],
+[2,'100, 90, 80, 70, ?','60',['65','50','75'],'Subtract 10 each time.'],
+[3,'What has keys but cannot open a door?','A keyboard',['A piano lock','A map','A drawer'],'A keyboard has keys you press to type.'],
+[3,'2, 3, 5, 8, 12, ?','17',['16','15','18'],'Add 1, 2, 3, 4, then 5.'],
+[3,'If today is Tuesday, what day will it be after 10 days?','Friday',['Thursday','Saturday','Monday'],'10 days is 1 week and 3 days. Tuesday + 3 = Friday.'],
+[3,'Mum is 4 times as old as Sam. Sam is 8. How old is Mum?','32',['12','28','36'],'8 × 4 = 32.']];
+const ENG=[
+['What does "enormous" mean?','Very big',['Very small','Very fast','Very old'],'Enormous means very big, like an elephant.'],
+['What does "gentle" mean?','Soft and kind',['Loud and rough','Fast and funny','Cold and dark'],'A gentle person is soft and kind.'],
+['What does "curious" mean?','Wanting to know more',['Feeling sleepy','Very hungry','Afraid'],'A curious child asks many questions.'],
+['What does "brave" mean?','Not afraid to try',['Very tired','Always angry','Very quiet'],'Brave people face scary things.'],
+['What does "ancient" mean?','Very, very old',['Brand new','Very shiny','Very tiny'],'Pyramids are ancient.'],
+['What does "swift" mean?','Quick',['Slow','Heavy','Loud'],'A falcon is swift.'],
+['Choose the right word: She ___ to school every day.','goes',['go','going','gone'],'With she, he or it we use "goes".'],
+['Choose the right word: They ___ playing football.','are',['is','am','be'],'With they, we use "are".'],
+['What is the opposite of "ancient"?','Modern',['Old','Heavy','Dark'],'Ancient is old, modern is new.'],
+['Which is a noun?','Camel',['Run','Quickly','Blue'],'A noun names a person, animal, place or thing.'],
+['Which is a verb (action word)?','Jump',['Table','Green','Happy'],'A verb tells what someone does.'],
+['Which word is an adjective?','Tall',['Dance','Door','Slowly'],'An adjective describes a noun.'],
+['Choose the right word: I saw ___ elephant at the zoo.','an',['a','the one','two'],'Use "an" before a vowel sound.'],
+['What is the plural of "child"?','Children',['Childs','Childes','Childrens'],'Child is an irregular plural.']];
+const EVS=[
+['Which part of a plant takes in water from the soil?','Roots',['Leaves','Flower','Stem'],'Roots drink water and hold the plant.'],
+['Which gas do we breathe in to stay alive?','Oxygen',['Carbon dioxide','Smoke','Steam'],'Plants give us oxygen.'],
+['What is the capital city of the UAE?','Abu Dhabi',['Dubai','Sharjah','Ajman'],'Abu Dhabi is the capital.'],
+['Which animal is called the "ship of the desert"?','Camel',['Horse','Goat','Lizard'],'Camels carry people and loads across sand.'],
+['What is the UAE national bird?','Falcon',['Parrot','Eagle owl','Sparrow'],'The falcon is loved in Arab culture.'],
+['The Sun is a ...','Star',['Planet','Moon','Cloud'],'The Sun is our closest star.'],
+['What do bees make?','Honey',['Milk','Butter','Sugar'],'Bees turn nectar into honey.'],
+['Plants make food using sunlight. This is called ...','Photosynthesis',['Evaporation','Digestion','Melting'],'Photo means light.'],
+['Which material is attracted by a magnet?','Iron nail',['Plastic spoon','Wooden stick','Paper clip made of plastic'],'Iron is magnetic.'],
+['Water turns to ice at about ...','0 °C',['50 °C','100 °C','20 °C'],'Water freezes at 0 °C.'],
+['Which is a mammal?','Dolphin',['Shark','Crab','Octopus'],'Dolphins breathe air and feed milk to babies.'],
+['Which sense organ do we use to smell?','Nose',['Ear','Eye','Tongue'],'The nose smells.'],
+['Which of these is a source of light?','The Sun',['The Moon','A mirror','A book'],'The Moon only reflects sunlight.'],
+['The UAE national tree is the ...','Ghaf',['Pine','Mango','Maple'],'The Ghaf tree survives in the desert.']];
+const ARB=[['كتاب','kitaab','book'],['ماء','maa\'','water'],['شمس','shams','sun'],['قمر','qamar','moon'],['بيت','bayt','house'],['جمل','jamal','camel'],['صقر','saqr','falcon'],['سمك','samak','fish'],['تفاح','tuffaah','apple'],['مدرسة','madrasa','school'],['صديق','sadeeq','friend'],['شكرا','shukran','thank you']];
+const EM=['🐱','🚀','🍎','⚽','🌵','🐢','🎈','🌙','🚲','🎸','🦊','🍕','⭐','🐳','🎨','🔔','🌈','🦁','🍉','🧩','🐘','🏰','🍩','🦋'];
+const OFF=['Sunday: Draw a map of your room or your neighbourhood. Add 5 landmarks and a legend.','Monday: Build the tallest tower you can from household items. Measure it, then try to beat it.','Tuesday: Write a 5-sentence story about a falcon who learns to be kind. Read it to someone.','Wednesday: Kitchen science. Does it sink or float? Test 8 objects, then write your guesses and results.','Thursday: Teach someone at home one thing you learned this week. Explain it in your own words.','Friday: Read for 15 minutes. Tell someone the best part and why you liked it.','Saturday: Make up 5 maths word problems about your family and solve them.','Invent a new board game with 5 rules. Teach it to your family and fix any rule that breaks.','Plan a party with AED 50. Write a mini budget for food, games and decorations.','Interview a grandparent or elder about their childhood. Write down 3 surprising facts.','Act out a scene from the Ramayana, the Mahabharata or a Shivaji Maharaj story with family.','Be a detective: find 5 things at home that use electricity and 5 that do not. Explain why.','Design a poster that teaches one healthy habit. Make it fun enough to put on the fridge.'];
+
+const DAY=new Date().getDay();
+const WT=['History','Technology and AI','Sports','Money and economics','Health and medicine','World and countries','Space and planet'];
+const TALK=['Pick one old building or place near you. Who built it, and why?','Where did you see AI or robots this week? How did they help people?','Find a sports result from today. What helped the winner succeed?','Look at the price of one thing in a shop. Why might it cost that much?','What is one healthy habit your family can start this week?','Find a country in the news on a globe. What is it known for?','Read or watch one child-friendly news story together. What happened, and what would you do?'];
+const WORLD=[
+[['Which ancient people built the pyramids of Giza?','Egyptians',['Romans','Greeks','Vikings'],'Ancient Egyptians built them as tombs for pharaohs.'],['Who was the first person to walk on the Moon?','Neil Armstrong',['Yuri Gagarin','Isaac Newton','Buzz Lightyear'],'Neil Armstrong landed in 1969 with Apollo 11.'],['In which year was the UAE formed?','1971',['1901','1950','2000'],'The UAE became one country on 2 December 1971.'],['Who is known as the Father of the UAE?','Sheikh Zayed',['Sheikh Khalifa Mosque','Ibn Battuta','Neil Armstrong'],'Sheikh Zayed bin Sultan Al Nahyan led the union of the emirates.'],['Which brothers built the first successful aeroplane?','Wright brothers',['Marx brothers','Grimm brothers','Lumiere brothers'],'Orville and Wilbur Wright flew in 1903.']],
+[['What does AI stand for?','Artificial Intelligence',['Always Internet','Awesome Idea','Automatic Input'],'AI is software that can learn and help solve problems.'],['Which of these is an input device?','Keyboard',['Monitor','Speaker','Printer'],'An input device sends information into the computer.'],['People who write instructions for computers are called ...','Programmers',['Painters','Pilots','Plumbers'],'Programmers write code.'],['What is the safest thing to do with your password?','Keep it secret',['Tell friends','Write it on a wall','Use your name'],'A password is like a key. Only you and a parent should know it.'],['What does Wi-Fi do?','Connects devices to the internet without wires',['Cooks food','Makes electricity','Cleans screens'],'Wi-Fi sends data through the air.']],
+[['How many players does one football team have on the pitch?','11',['9','10','12'],'Eleven including the goalkeeper.'],['Which sport is played at Wimbledon?','Tennis',['Cricket','Golf','Hockey'],'Wimbledon is a famous tennis tournament.'],['How often are the Summer Olympic Games held?','Every 4 years',['Every year','Every 2 years','Every 10 years'],'The Olympics happen every four years.'],['How many stumps are there in cricket?','3',['2','4','5'],'Three stumps with two bails on top.'],['Which country hosted the FIFA World Cup in 2022?','Qatar',['Brazil','Japan','Spain'],'Qatar hosted it, in the Gulf region.']],
+[['What is the currency of the UAE?','Dirham',['Dollar','Rupee','Pound'],'The UAE dirham is written AED.'],['Where can we keep money safely?','In a bank',['Under a tree','In a pocket forever','In a bin'],'Banks keep savings safe.'],['You save AED 10 each week. How much after 4 weeks?','AED 40',['AED 14','AED 20','AED 100'],'10 × 4 = 40.'],['Which of these is a need, not a want?','Food',['A new game','A toy car','Sweets'],'Needs keep us healthy and safe.'],['A toy costs AED 35. You pay AED 50. How much change?','AED 15',['AED 25','AED 5','AED 85'],'50 − 35 = 15.']],
+[['How long should you brush your teeth?','2 minutes',['10 seconds','30 seconds','10 minutes'],'Two minutes, twice a day.'],['Which vitamin does sunlight help our body make?','Vitamin D',['Vitamin Z','Vitamin K only','Vitamin Zero'],'Vitamin D keeps bones strong. Remember sun safety too.'],['Who should you ask before taking any medicine?','A parent or doctor',['A friend','Nobody','A stranger'],'Medicine is safe only when a trusted adult gives the right amount.'],['What do vaccines do?','Help the body fight diseases',['Make us taller','Give us sleep','Clean our teeth'],'Vaccines train the body to protect itself.'],['How much sleep does a child your age need?','9 to 12 hours',['3 to 4 hours','5 to 6 hours','14 to 16 hours'],'Sleep helps your brain store what you learned.']],
+[['Which group helps countries work together for peace?','United Nations',['Football Club','Space Agency','World Bank Bus'],'The UN has almost every country as a member.'],['Which is the largest ocean?','Pacific Ocean',['Atlantic Ocean','Indian Ocean','Arctic Ocean'],'The Pacific is bigger than all the land on Earth.'],['How many emirates make up the UAE?','7',['5','6','9'],'Abu Dhabi, Dubai, Sharjah, Ajman, Umm Al Quwain, Ras Al Khaimah and Fujairah.'],['The UAE is on which continent?','Asia',['Africa','Europe','Australia'],'The UAE is in western Asia.'],['Egypt is on which continent?','Africa',['Asia only','Europe','South America'],'Egypt is in north-east Africa.']],
+[['Which energy comes from the Sun?','Solar energy',['Coal energy','Wind energy','Diesel energy'],'Solar panels turn sunlight into electricity.'],['The UAE Hope Probe travelled to which planet?','Mars',['Venus','Jupiter','Saturn'],'Hope reached Mars orbit in 2021.'],['Which Emirati astronaut spent six months on the space station in 2023?','Sultan AlNeyadi',['Sheikh Zayed','Ibn Battuta','Neil Armstrong'],'Sultan AlNeyadi was the first Arab on a long space mission.'],['What does recycling do?','Reuses materials to make new things',['Makes more rubbish','Burns water','Hides plastic'],'Recycling saves resources.'],['Why are trees important?','They give oxygen and clean the air',['They make noise','They stop rain','They make the Sun hotter'],'Trees take in carbon dioxide and release oxygen.']]];
+const WT2=['Global power','Technology power','Sport and business','Economics and finance','Health and pharma','Trade and geography','Climate and cooperation'];
+const IT=['Ramayana','Mahabharata and the Gita','Deities and festivals','Shivaji Maharaj and the Marathas','Ancient and medieval India','British era and freedom struggle','Faiths and the Constitution'];
+const WORLD2=[
+[['How many permanent members does the UN Security Council have?','5',['3','7','10'],'The USA, UK, France, Russia and China. They can veto decisions.'],['Which of these is a member of the G20 group of big economies?','India',['Nepal','Qatar','Sri Lanka'],'The G20 covers most of the world economy.'],['Which two countries have the largest economies in the world?','USA and China',['India and Japan','Russia and Brazil','UAE and Qatar'],'By total GDP, the USA and China are number one and two.']],
+[['Which place makes most of the world advanced computer chips?','Taiwan',['Egypt','Norway','Peru'],'Chips power phones, cars and AI, so chip supply matters to every country.'],['Which Abu Dhabi university is dedicated to AI?','MBZUAI',['NYU Games','Zayed Zoo','ADNOC School'],'MBZUAI is a graduate research university for artificial intelligence.'],['Which agency landed Chandrayaan-3 near the Moon south pole in 2023?','ISRO',['NASA','ESA','JAXA'],'India was the first country to land near the lunar south pole.']],
+[['Which three countries are hosting the FIFA World Cup in 2026?','USA, Canada and Mexico',['UAE, Qatar and Oman','India, Nepal and Bhutan','Brazil, Chile and Peru'],'It is the first World Cup with three hosts.'],['Which city hosts the 2028 Summer Olympics?','Los Angeles',['Paris','Tokyo','Dubai'],'Paris hosted in 2024.'],['The Formula 1 season often ends in which UAE circuit?','Yas Marina, Abu Dhabi',['Burj Khalifa','Dubai Creek','Sharjah Corniche'],'The Abu Dhabi Grand Prix is held at Yas Marina.']],
+[['When prices of things keep rising over time, it is called ...','Inflation',['Education','Evaporation','Exports'],'With inflation, the same money buys less.'],['A share of a company is a small piece of its ...','Ownership',['Building only','Name only','Logo only'],'Shareholders own part of the company. Share prices go up and down.'],['Money a bank pays you for keeping savings is called ...','Interest',['Tax','Fine','Rent'],'Saving early lets money grow with interest.'],['Which Indian city is called the financial capital?','Mumbai',['Delhi','Pune','Chennai'],'The Reserve Bank of India and the Bombay Stock Exchange are in Mumbai.']],
+[['Antibiotics work against ...','Bacteria',['Viruses','Hunger','Heat'],'They do not work on colds or flu, which are caused by viruses.'],['Who discovered penicillin, the first antibiotic?','Alexander Fleming',['Isaac Newton','Louis Vuitton','Thomas Edison'],'He noticed in 1928 that mould killed bacteria.'],['Which country is nicknamed the pharmacy of the world?','India',['Iceland','Chile','Kenya'],'India makes a large share of the worlds generic medicines and vaccines.'],['Why are new medicines tested for years before approval?','To check they are safe and work',['To make them taste sweet','To make them bigger','For fun'],'Clinical trials protect patients.']],
+[['Which narrow waterway near the UAE carries a large share of the worlds oil ships?','Strait of Hormuz',['Suez Canal','Panama Canal','Bering Strait'],'Many Gulf countries ship oil through it.'],['Which canal in Egypt joins the Mediterranean Sea and the Red Sea?','Suez Canal',['Panama Canal','Hormuz Canal','Nile Canal'],'It shortens ship journeys between Asia and Europe.'],['Selling goods to other countries is called ...','Exporting',['Importing','Recycling','Borrowing'],'Importing is buying from other countries.'],['The ancient Silk Road joined Asia with ...','Europe',['Antarctica','Hawaii','The Moon'],'Traders carried silk, spices and ideas along it.']],
+[['COP28, a big world climate meeting, was held in which city in 2023?','Dubai',['Paris','Mumbai','Tokyo'],'Countries met to agree how to reduce pollution.'],['Which gas mainly traps heat and warms Earth?','Carbon dioxide',['Oxygen','Helium','Nitrogen'],'Burning coal, oil and gas releases it.'],['Abu Dhabi Masdar is known for what?','Clean energy',['Fishing','Cars','Cotton'],'Masdar builds solar and wind projects.']]];
+const INDIA=[
+[['Who wrote the Ramayana?','Valmiki',['Vyasa','Tulsidas only','Kalidasa'],'Sage Valmiki is the Adi Kavi, the first poet.'],['Who is the wife of Lord Rama?','Sita',['Radha','Parvati','Lakshmi'],'Sita is the daughter of King Janaka.'],['Which devotee of Rama carried the Sanjeevani mountain?','Hanuman',['Jatayu','Sugriva','Angad'],'Hanuman brought the healing herb for Lakshmana.'],['Diwali is linked to Rama returning to which city?','Ayodhya',['Mathura','Lanka','Dwarka'],'People lit lamps to welcome him home.'],['Who was the ten-headed king defeated by Rama?','Ravana',['Kansa','Hiranyakashipu','Duryodhana'],'Dussehra celebrates the victory of good over evil.']],
+[['Who is traditionally said to have composed the Mahabharata?','Ved Vyasa',['Valmiki','Chanakya','Kalidasa'],'Ved Vyasa also arranged the Vedas.'],['Who taught the Bhagavad Gita to Arjuna?','Krishna',['Bhima','Drona','Indra'],'Krishna was Arjuna charioteer.'],['Where was the great Mahabharata war fought?','Kurukshetra',['Ayodhya','Hastinapur Palace','Ujjain'],'Kurukshetra is in present-day Haryana.'],['How many Pandava brothers were there?','5',['3','7','100'],'Yudhishthira, Bhima, Arjuna, Nakula and Sahadeva.'],['Who taught archery to the Pandavas and Kauravas?','Dronacharya',['Vashishtha','Parashurama','Shukracharya'],'Drona was their guru.']],
+[['Which god has an elephant head?','Ganesha',['Hanuman','Kartikeya','Indra'],'He is the remover of obstacles.'],['In the Trimurti, who is the preserver?','Vishnu',['Brahma','Shiva','Indra'],'Brahma creates, Vishnu preserves, Shiva transforms.'],['Navaratri honours which goddess?','Durga',['Saraswati only','Ganga','Sita'],'Nine nights honour her many forms.'],['Which animal is Lord Shiva vahana?','Nandi the bull',['Lion','Peacock','Mouse'],'Nandi is Shivas devoted bull.'],['Holi remembers the story of which devotee?','Prahlad',['Dhruva','Arjuna','Eklavya'],'Prahlad survived the fire while Holika did not.']],
+[['In which year was Shivaji Maharaj born?','1630',['1530','1700','1857'],'He was born at Shivneri Fort.'],['Who was Shivaji Maharaj mother?','Jijabai',['Ahilyabai','Sai Bai','Tarabai'],'Jijabai taught him courage and justice.'],['At which fort was Shivaji crowned Chhatrapati in 1674?','Raigad',['Red Fort','Golconda','Amer'],'Raigad became his capital.'],['Shivaji surprise-attack style of fighting is called ...','Ganimi Kava',['Kalaripayattu','Mallayuddha','Dhurandhar'],'Fast raids and clever use of hills and forts.'],['Which Maratha leader captured Sinhagad in 1670?','Tanaji Malusare',['Bajirao','Sambhaji','Hambirrao'],'He gave his life in the battle.'],['Shivaji is remembered for building a strong ...','Navy',['Air force','Railway','Telegraph'],'He built sea forts like Sindhudurg.']],
+[['Mohenjo-daro belonged to which ancient civilisation?','Indus Valley',['Maurya','Gupta','Chola'],'It had planned cities and drains about 4500 years ago.'],['Which emperor turned to Buddhism after the Kalinga war?','Ashoka',['Akbar','Chandragupta','Harsha'],'Ashoka spread peace across his empire.'],['Who built the Taj Mahal?','Shah Jahan',['Akbar','Babur','Aurangzeb'],'For his wife Mumtaz Mahal in Agra.'],['Which idea did ancient India give the world?','Zero as a number',['The telephone','The computer','The aeroplane'],'Mathematicians like Aryabhata and Brahmagupta developed it.'],['Who advised Chandragupta Maurya?','Chanakya',['Birbal','Tansen','Kalidasa'],'He wrote the Arthashastra.']],
+[['In which year did the Battle of Plassey take place?','1757',['1857','1947','1600'],'Robert Clive won it, strengthening the East India Company.'],['Which queen led the 1857 revolt at Jhansi?','Rani Lakshmibai',['Razia Sultana','Rani Padmini','Chand Bibi'],'She is a symbol of courage.'],['Where was the 1919 Jallianwala Bagh tragedy?','Amritsar',['Delhi','Kolkata','Lahore'],'It increased anger against British rule.'],['Gandhi Salt March of 1930 ended at ...','Dandi',['Wardha','Porbandar','Surat'],'It protested against the salt tax.'],['On which date did India become independent?','15 August 1947',['26 January 1950','2 October 1869','1 January 1900'],'26 January 1950 is Republic Day.'],['Who founded the Azad Hind Fauj (Indian National Army)?','Subhas Chandra Bose',['Bhagat Singh','Lala Lajpat Rai','Tilak'],'He gave the call Jai Hind.']],
+[['Who founded Sikhism?','Guru Nanak',['Mahavira','Kabir','Ramanuja'],'Sikhs follow the Guru Granth Sahib.'],['Where was Gautama Buddha born?','Lumbini',['Delhi','Ayodhya','Kashi'],'Lumbini is in present-day Nepal.'],['Jainism teaches which key idea?','Ahimsa (non-violence)',['Speed','Wealth','Fame'],'Mahavira was the 24th Tirthankara.'],['Which Hindu temple opened in Abu Dhabi in 2024?','BAPS Hindu Mandir',['Kailasa Temple','Konark Sun Temple','Meenakshi Temple'],'It shows the UAE respect for many faiths.'],['Who chaired the drafting committee of the Indian Constitution?','Dr B R Ambedkar',['Jawaharlal Nehru','Sardar Patel','Tagore'],'It came into effect on 26 January 1950.']]];
+/* ---------- activities ---------- */
+const ACTS_OLD=[
+{id:'mem',ic:'🧠',t:'Memory flash',m:3,d:'Look, hide, remember',run:memory},
+{id:'math',ic:'➕',t:'Maths sprint',m:6,d:'Mental maths, 5 questions',run:()=>quiz('math',Array.from({length:5},()=>mathQ(L('math'))),'Maths sprint','math')},
+{id:'logic',ic:'🧩',t:'Logic puzzles',m:5,d:'Patterns, riddles, reasoning',run:()=>quiz('logic',pick(LOGIC.filter(x=>x[0]<=Math.min(3,L('logic'))),4).map(x=>mk(x[1],x[2],x[3],x[4])),'Logic puzzles','logic')},
+{id:'eng',ic:'📖',t:'English power',m:5,d:'Words and grammar',run:()=>quiz('eng',pick(ENG,4).map(x=>mk(x[0],x[1],x[2],x[3])),'English power')},
+{id:'evs',ic:'🌍',t:'Science and world',m:5,d:'EVS facts about our world',run:()=>quiz('evs',pick(EVS,4).map(x=>mk(x[0],x[1],x[2],x[3])),'Science and world')},
+{id:'ar',ic:'🕌',t:'Arabic word box',m:3,d:'Three new words',run:()=>quiz('ar',pick(ARB,3).map(x=>{const w=shuf(ARB.filter(y=>y!=x)).slice(0,3).map(y=>y[2]);return mk(`<div class="ar">${x[0]}</div>What does <b>${x[1]}</b> mean?`,x[2],w,`${x[1]} means ${x[2]}.`)}),'Arabic word box')},
+{id:'world',ic:'🌐',t:'World explorer',m:6,d:WT[DAY]+' and '+WT2[DAY],run:()=>quiz('world',[...pick(WORLD[DAY],2),...pick(WORLD2[DAY],2)].map(x=>mk(x[0],x[1],x[2],x[3])),'World explorer')},
+{id:'india',ic:'🕉️',t:'India and heritage',m:6,d:IT[DAY],run:()=>quiz('india',pick(INDIA[DAY],4).map(x=>mk(x[0],x[1],x[2],x[3])),'India and heritage: '+IT[DAY])},
+{id:'off',ic:'🎨',t:'Hands-on challenge',m:5,d:'Away from the screen',run:offline}];
+const HIN=[['What does the Hindi word सेब mean?','Apple',['Mango','Banana','Orange'],'सेब (seb) is apple.'],['What does पानी mean?','Water',['Milk','Fire','Bread'],'पानी (paani) is water.'],['The opposite of बड़ा (big) is ...','छोटा (small)',['लंबा','मोटा','नया'],'बड़ा is big and छोटा is small.'],['What does किताब mean?','Book',['Pen','Bag','Chair'],'किताब (kitaab) is book.'],['सूरज means ...','Sun',['Moon','Star','Cloud'],'सूरज (sooraj) is the Sun.'],['Which Hindi word means mother?','माँ',['पिता','भाई','दादी'],'माँ (maa) is mother.'],['What does फूल mean?','Flower',['Fruit','Leaf','Tree'],'फूल (phool) is flower.'],['रविवार is which day?','Sunday',['Monday','Friday','Saturday'],'रविवार (ravivaar) is Sunday.'],['The opposite of दिन (day) is ...','रात (night)',['सुबह','शाम','दोपहर'],'दिन is day and रात is night.']];
+const ARBQ=ARB.map(x=>['What does the Arabic word '+x[0]+' ('+x[1]+') mean?',x[2],shuf(ARB.filter(y=>y!=x)).slice(0,3).map(y=>y[2]),x[1]+' means '+x[2]+'.']);
+const CATS=[['🧩 Logic',LOGIC.map(x=>[x[1],x[2],x[3],x[4]])],['📖 English',ENG],['🌿 Nature',EVS],['🕌 Arabic',ARBQ],['🗣️ Hindi',HIN],['🌐 World',WORLD.flat()],['📈 Big world',WORLD2.flat()],['🕉️ India and faith',INDIA.flat()]];
+function oneQ(c){S.seen=S.seen||{};let un=c[1].filter(x=>!S.seen[x[0]]);if(!un.length){c[1].forEach(x=>delete S.seen[x[0]]);un=c[1]}const x=un[Math.floor(Math.random()*un.length)];S.seen[x[0]]=1;return{x,cat:c[0]}}
+const cats=n=>[...shuf(CATS),...shuf(CATS)].slice(0,n);
+const esc=s=>String(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function nextNew(){S.fresh=S.fresh||[];if(S.fresh.length){const x=S.fresh.shift();S.recent=[...(S.recent||[]),x[0]].slice(-40);return{x:[x[0],x[1],x[2],x[3]],cat:x[4]}}return oneQ(CATS[Math.floor(Math.random()*CATS.length)])}
+function retries(k){S.missed=S.missed||[];const t=Date.now();return S.missed.filter(m=>m.due<=t).slice(0,k).map(m=>({x:m.x,cat:m.cat,retry:true}))}
+function track(it,ok){S.missed=S.missed||[];const i=S.missed.findIndex(m=>m.x[0]==it.x[0]);if(ok){if(i>=0&&it.retry){S.missed.splice(i,1);S.fixed=(S.fixed||0)+1}}else{const d=Date.now()+20*36e5;if(i>=0)S.missed[i].due=d;else S.missed.push({x:it.x,cat:(it.cat||'').replace(/ 🔁.*/,''),due:d});S.missed=S.missed.slice(-60)}}
+const toQ=o=>{const m=mk(o.x[0],o.x[1],o.x[2],o.x[3]);m.cat=o.cat+(o.retry?' 🔁 try again':'');m.x=o.x;m.retry=o.retry;return m};
+const mixQ=n=>{const rt=retries(Math.round(n*.25));const nw=Array.from({length:n-rt.length},nextNew);return shuf([...rt,...nw]).map(toQ)};
+const fibQ=n=>Array.from({length:n},nextNew).map(o=>{const x=o.x,t=Math.random()<.5,s=t?x[1]:shuf(x[2])[0];return{q:x[0]+'<br><b>Is it: '+s+'?</b>',o:['✅ Fact','❌ Fib'],a:t?0:1,e:'The answer is '+x[1]+'. '+x[3],cat:o.cat,x}});
+async function gen(){try{if(sb&&USER)return await genSb();if(!window.claude)return 0;const sm=await claude.use('sample');if(!sm)return 0;S.fresh=S.fresh||[];const news=(S.news||'').trim();
+const p='You write quiz questions for a curious '+PR().age+'-year-old (CBSE Grade '+PR().grade+', lives in Abu Dhabi, Indian family). Create 14 multiple-choice questions, randomly mixing these topics: Hindu epics and mythology, Indian history (Shivaji Maharaj and the Marathas, Mughals, British era, freedom struggle), other religions (informative and neutral), world geography and geopolitics, economics and finance, AI and technology, health and medicine, space and science, sports, nature, the UAE, logic riddles, English words and grammar, Arabic words, simple Hindi words (Devanagari with English meaning). Include 4 questions on recent world events you are confident about (neutral, factual, non-graphic, never taking sides; if unsure, ask about the background concept instead of inventing details).'+(news?' The parent says this is in the news today: '+JSON.stringify(news.slice(0,400))+'. Make 4 questions from it in child-friendly language.':'')+' '+diffNote()+chNote()+' Use simple, fun wording. Keep answers under 6 words. Wrong options must be plausible. Do not repeat: '+(S.recent||[]).slice(-20).join(' | ')+'. Return ONLY a JSON array of objects like {"q":"","c":"correct answer","w":["wrong1","wrong2","wrong3"],"e":"one fun sentence explaining the answer","cat":"emoji and topic, e.g. 🌐 World"}.';
+let a=await Promise.race([sm.json(p,{cache:false}),new Promise((_,j)=>setTimeout(()=>j(0),45000))]);if(!Array.isArray(a))a=a&&(a.questions||a.items);
+const ok=(a||[]).filter(o=>o&&o.q&&o.c&&Array.isArray(o.w)&&o.w.length>=3&&o.e).map(o=>[String(o.q),String(o.c),o.w.slice(0,3).map(String),String(o.e),String(o.cat||'✨ Fresh')]);
+if(!ok.length)return 0;S.fresh=(news?[...ok,...S.fresh]:[...S.fresh,...ok]).slice(0,60);S.news='';save();return ok.length}catch(e){return 0}}
+async function genSb(){S.fresh=S.fresh||[];const p=PR(),news=(S.news||'').trim(),st=Object.entries(S.stats||{}).filter(([k,v])=>v.r+v.w>=5).map(([k,v])=>[k,v.r/(v.r+v.w)]);
+const body={grade:p.grade,age:p.age,news:news.slice(0,400),chapters:(S.chapters||'').slice(0,200),weak:st.filter(x=>x[1]<.5).map(x=>x[0]),strong:st.filter(x=>x[1]>.85).map(x=>x[0]),recent:(S.recent||[]).slice(-20)};
+let a=null;window.LASTERR='';try{const r=await Promise.race([sb.functions.invoke('make-questions',{body}),new Promise((_,j)=>setTimeout(()=>j('timed out after 90 seconds'),90000))]);a=r&&r.data&&r.data.items;if(r&&r.error)window.LASTERR='function error '+((r.error.context&&r.error.context.status)||r.error.message);else if(r&&r.data&&r.data.error)window.LASTERR=String(r.data.error).slice(0,160)}catch(e){window.LASTERR=String(e).slice(0,160)}
+if(!Array.isArray(a)||!a.length){const q=await sb.from('questions').select('q,c,w,e,cat').eq('grade',p.grade).order('created_at',{ascending:false}).limit(80);a=(q.data||[]).filter(o=>!(S.recent||[]).includes(o.q)).slice(0,14)}
+const ok=(a||[]).filter(o=>o&&o.q&&o.c&&Array.isArray(o.w)&&o.w.length>=3&&o.e).map(o=>[String(o.q),String(o.c),o.w.slice(0,3).map(String),String(o.e),String(o.cat||'\u2728 Fresh')]);
+if(!ok.length)return 0;S.fresh=(news?[...ok,...S.fresh]:[...S.fresh,...ok]).slice(0,60);S.news='';save();return ok.length}
+async function ensureFresh(){S.fresh=S.fresh||[];if(S.fresh.length>=8||!(window.claude||(sb&&USER)))return;shell('Getting ready','<p class="q">Cooking up fresh questions… ✨</p><p class="fb">This takes a few seconds.</p>');await gen()}
+function diffNote(){const e=Object.entries(S.stats||{}).filter(([k,v])=>v.r+v.w>=5).map(([k,v])=>[k,v.r/(v.r+v.w)]);const lo=e.filter(x=>x[1]<.5).map(x=>x[0]),hi=e.filter(x=>x[1]>.85).map(x=>x[0]);return(lo.length?'Make these topics easier: '+lo.join(', ')+'.':'')+(hi.length?' Make these topics harder: '+hi.join(', ')+'.':'')}
+const chNote=()=>S.chapters?' School topics this month: '+String(S.chapters).slice(0,200)+'. Include 3 questions on these.':'';
+function suggest(){const st=Object.entries(S.stats||{}).filter(([k,v])=>v.r+v.w>=4).map(([k,v])=>({k,a:v.r/(v.r+v.w)})).sort((a,b)=>a.a-b.a),o=[];
+if(st[0]&&st[0].a<.6)o.push('Practise '+st[0].k+' together for 10 minutes. He gets '+Math.round(st[0].a*100)+'% right.');
+const hi=st[st.length-1];if(hi&&hi.a>.85)o.push('He is strong in '+hi.k+'. Ask him to explain it to you in his own words.');
+if((S.missed||[]).length>10)o.push('Many questions are waiting for a retry. Review a few together at dinner.');
+if((S.streak||0)<3)o.push('Build the streak: fix a daily 30 to 45 minute slot.');
+if(!o.length)o.push('Great work. Keep the habit and talk about one news story together.');return o}
+function report(){const d=(S.log||{})[key]||{r:0,w:0},st=Object.entries(S.stats||{}).filter(([k,v])=>v.r+v.w>=3).map(([k,v])=>[k,Math.round(100*v.r/(v.r+v.w))]).sort((a,b)=>a[1]-b[1]);
+return 'Brain Quest report for '+PR().name+' on '+key+'\n\nRounds done today: '+Object.keys((S.done||{})[key]||{}).length+'/'+ACTS.length+'\nQuestions today: '+d.r+' right, '+d.w+' missed\nStreak: '+S.streak+' days. Stars: '+S.stars+'\nWeakest topics: '+(st.slice(0,3).map(x=>x[0]+' '+x[1]+'%').join(', ')||'not enough data yet')+'\nStrongest topics: '+(st.slice(-2).map(x=>x[0]+' '+x[1]+'%').join(', ')||'not enough data yet')+'\nQuestions to revisit: '+(S.missed||[]).length+'\n\nSuggestions:\n- '+suggest().join('\n- ')}
+const mailto=()=>'mailto:?subject='+encodeURIComponent('Brain Quest report: '+PR().name+' '+key)+'&body='+encodeURIComponent(report());
+const PASS=[{t:'The Clever Camel',x:'Zayed lives in Abu Dhabi. Every Friday his grandfather takes him to see the camels. The smallest camel, Noor, always runs to Zayed first. Zayed gives her dates and she hums softly.',qs:[['Which city does Zayed live in?','Abu Dhabi',['Dubai','Mumbai','Pune'],'The story says Abu Dhabi.'],['What is the smallest camel called?','Noor',['Zayed','Dates','Friday'],'The smallest camel is Noor.'],['What does Zayed give Noor?','Dates',['Grass','Water','Apples'],'He gives her dates.']],w:'Write 2 sentences: what would you name a baby camel, and why?'},{t:'The Fort on the Hill',x:'Meera climbed the steps of an old fort with her father. At the top she saw green hills all around. Her father told her that brave soldiers once guarded the fort. Meera felt proud of her country.',qs:[['Who climbed the fort with Meera?','Her father',['Her teacher','Her friend','Her uncle'],'She went with her father.'],['What did Meera see at the top?','Green hills',['The sea','A desert','A city'],'She saw green hills.'],['How did Meera feel at the end?','Proud',['Scared','Sleepy','Angry'],'She felt proud.']],w:'Write 2 sentences about a place you would love to visit and why.'}];
+async function readRound(){shell('Read and write','<p class="q">Finding a story… 📚</p>');let p=null;try{const sm=window.claude&&await claude.use('sample');if(sm){const th=['space','kindness','a festival','an animal','inventions','a historical hero','the sea'][Math.floor(Math.random()*7)];const r=await Promise.race([sm.json('Write a fun 70-word story for a '+PR().age+'-year-old in Grade '+PR().grade+' in Abu Dhabi about '+th+'. Return ONLY JSON like {"t":"title","x":"story","qs":[{"q":"","c":"correct","w":["","",""],"e":""}],"w":"a 2-sentence creative writing prompt"} with exactly 3 comprehension questions.',{cache:false}),new Promise((_,j)=>setTimeout(()=>j(0),40000))]);if(r&&r.x&&r.qs&&r.qs.length>=3)p={t:r.t||'Story time',x:r.x,w:r.w,qs:r.qs.slice(0,3).map(o=>[o.q,o.c,o.w,o.e])}}}catch(e){}
+if(!p)p=PASS[Math.floor(Math.random()*PASS.length)];WP=p.w||'Write 2 sentences about your favourite part of the story.';
+shell(esc(p.t),'<p class="q" style="font-size:19px;font-weight:400">'+esc(p.x)+'</p><p>Read it aloud once, slowly. 🎤</p><button class="main" id="rd">I read it! Questions →</button>');
+$('#rd').onclick=()=>quiz('read',p.qs.map(x=>{const m=mk(x[0],x[1],x[2],x[3]);m.cat='📚 Reading';return m}),'Read and write')}
+function dash(){VIEW='d';const l=S.log||{},days=[];for(let i=13;i>=0;i--){const k=new Date(Date.now()-i*864e5).toLocaleDateString('en-CA'),v=l[k]||{r:0,w:0};days.push([k.slice(5),v.r+v.w,Object.keys((S.done||{})[k]||{}).length])}
+const mx=Math.max(1,...days.map(d=>d[1])),st=Object.entries(S.stats||{}).map(([k,v])=>[k,v.r+v.w,v.r/(v.r+v.w)]).filter(x=>x[1]>0).sort((a,b)=>a[2]-b[2]),tot=st.reduce((s,x)=>s+x[1],0),cor=Object.values(S.stats||{}).reduce((s,v)=>s+v.r,0),g=G();
+app.innerHTML=`<button class='back' id='bk'>← Kid view</button><h1>${PR().emoji} ${esc(PR().name)}: parent dashboard</h1><p class='sub'>${key}. Syncs from the child's device.</p><div class='stats'><div class='stat'><b>🔥 ${S.streak||0}</b><span>streak</span></div><div class='stat'><b>${tot?Math.round(100*cor/tot):0}%</b><span>accuracy</span></div><div class='stat'><b>${days.filter(d=>d[2]>0).length}/14</b><span>days active</span></div></div>
+<div class='panel'><b>Questions per day, last 14 days</b><div style='display:flex;align-items:flex-end;gap:3px;height:80px;margin-top:8px'>${days.map(d=>`<div title='${d[0]}: ${d[1]}' style='flex:1;background:var(--acc);border-radius:4px 4px 0 0;height:${Math.max(3,d[1]/mx*100)}%'></div>`).join('')}</div></div>
+<div class='panel mt'><b>Accuracy by topic</b>${st.length?st.map(x=>`<p style='margin:8px 0 0'>${esc(x[0])}: ${Math.round(x[2]*100)}% <small>(${x[1]} answered)</small></p><div class='bar' style='margin:2px 0'><i style='width:${x[2]*100}%;background:${x[2]<.6?'var(--bad)':'var(--ok)'}'></i></div>`).join(''):'<p class="sub">Topics appear after he answers a few questions.</p>'}</div>
+<div class='panel mt'><b>Suggestions</b><ul>${suggest().map(s=>`<li>${esc(s)}</li>`).join('')}</ul><button class='main' id='ai'>✨ Get coaching tips from Claude</button><p id='aio' style='white-space:pre-wrap'></p></div>
+<div class='panel mt'><b>To review together (${(S.missed||[]).length})</b>${(S.missed||[]).slice(0,8).map(m=>`<p style='margin:8px 0 0'>${esc(m.x[0].replace(/<[^>]*>/g,' '))}<br><small>Answer: ${esc(m.x[1])}</small></p>`).join('')||'<p class="sub">Nothing waiting.</p>'}</div>
+<div class='panel mt'><b>Reward goal</b><p>🎁 ${esc(g.t)} at ⭐ ${g.n} (now ⭐ ${S.stars||0})</p><input id='gt' value='${esc(g.t)}' style='width:100%;font:inherit;padding:8px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)'><input id='gn' type='number' value='${g.n}' style='width:100%;font:inherit;padding:8px;margin-top:6px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)'><button class='back' id='gsv' style='margin-top:8px'>Save reward</button></div>
+<a class='lnk' href='${mailto()}'>✉️ Email me this report</a>`;
+$('#bk').onclick=home;$('#gsv').onclick=()=>{S.goal={n:+$('#gn').value||100,t:$('#gt').value||'Reward'};save();dash()};
+$('#ai').onclick=async()=>{const o=$('#aio');o.textContent='Thinking…';try{const sm=await claude.use('sample');if(!sm){o.textContent='Not available here.';return}const r=await sm('You are a friendly child-learning coach. A parent shares this report about a '+PR().age+'-year-old (CBSE Grade '+PR().grade+', Abu Dhabi). Give 4 short practical suggestions for next week and 1 area of improvement. Plain text, no markdown.\n\n'+report()+'\nTopic accuracy: '+JSON.stringify(Object.fromEntries(st.map(x=>[x[0],Math.round(x[2]*100)]))),{cache:false});o.textContent=r.text}catch(e){o.textContent='Could not reach Claude right now.'}}}
+const mixQ_old=n=>cats(n).map(c=>{const{x,cat}=oneQ(c);const m=mk(x[0],x[1],x[2],x[3]);m.cat=cat;return m});
+const fibQ_old=n=>cats(n).map(c=>{const{x,cat}=oneQ(c);const t=Math.random()<.5,s=t?x[1]:shuf(x[2])[0];return{q:x[0]+'<br><b>Is it: '+s+'?</b>',o:['✅ Fact','❌ Fib'],a:t?0:1,e:'The answer is '+x[1]+'. '+x[3],cat}});
+function ninjaQ(){const lg=pick(LOGIC.filter(x=>x[0]<=Math.min(3,L('logic'))),2).map(x=>{const m=mk(x[1],x[2],x[3],x[4]);m.cat='🧩 Logic';return m});const ma=Array.from({length:4},()=>{const m=mathQ(L('math'));m.cat='🔢 Maths';return m});return shuf([...ma,...lg])}
+const R=[
+{id:'mem',ic:'🧠',t:'Memory flash',m:3,d:'Look, hide, remember',run:memory},
+{id:'mix1',ic:'🎲',t:'Mystery mix',m:6,d:'6 surprise questions',run:async()=>{await ensureFresh();quiz('mix1',mixQ(6),'Mystery mix')}},
+{id:'ninja',ic:'🥷',t:'Number ninja',m:6,d:'Maths and puzzles',run:()=>quiz('ninja',ninjaQ(),'Number ninja','math')},
+{id:'fib',ic:'🕵️',t:'Fact or fib?',m:5,d:'Spot the fake, 8 quick ones',run:async()=>{await ensureFresh();quiz('fib',fibQ(8),'Fact or fib?')}},
+{id:'mix2',ic:'🎁',t:'Surprise box',m:6,d:'Open it and see',run:async()=>{await ensureFresh();quiz('mix2',mixQ(6),'Surprise box')}},
+{id:'mix3',ic:'🚀',t:'Quest round',m:6,d:'Anything can appear',run:async()=>{await ensureFresh();quiz('mix3',mixQ(6),'Quest round')}},
+{id:'off',ic:'🎨',t:'Hands-on challenge',m:6,d:'Away from the screen',run:offline},
+{id:'read',ic:'📚',t:'Read and write',m:7,d:'A story, questions, a little writing',run:readRound}];
+const ACTS=(()=>{const a=R.slice(0,-1);for(let i=a.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return[...a,R[R.length-1]]})();
+const total=ACTS.reduce((s,a)=>s+a.m,0);
+let tok=0;
+
+function home(){VIEW='h';tok++;const d=S.done[key]||{},n=Object.keys(d).length;
+ app.innerHTML=`<button class="back" id="sw">⇄ Switch child</button> <button class="back" id="pf">👤 Profile</button><h1>${PR().emoji} Hi ${esc(PR().name)}!</h1><p class="sub">About ${total} minutes. Topics are a surprise every day. Do the rounds in any order.</p>
+ <div class="stats"><div class="stat"><b>🔥 ${S.streak}</b><span>day streak</span></div><div class="stat"><b>⭐ ${S.stars}</b><span>stars</span></div><div class="stat"><b>${n}/${ACTS.length}</b><span>done today</span></div></div>
+ <div class="bar"><i style="width:${n/ACTS.length*100}%"></i></div>
+ <p class="sub">🎁 ${esc(G().t)}: ⭐ ${S.stars}/${G().n}${S.stars>=G().n?' 🎉 Earned! Tell a parent.':''}</p>
+ ${n==ACTS.length?`<div class="panel" style="margin-bottom:12px"><b>🎉 All done for today!</b><br>Come back tomorrow to keep your streak going.<br><a class="lnk" href="${mailto()}">✉️ Email today's report to a parent</a></div>`:''}
+ ${ACTS.map(a=>`<button class="act ${d[a.id]!==undefined?'done':''}" data-id="${a.id}"><span class="ic">${a.ic}</span><span><b>${a.t}</b><small>${a.d}</small></span><span class="tag">${d[a.id]!==undefined?'✓ done':a.m+' min'}</span></button>`).join('')}
+ <details class="panel" style="margin:10px 0"><summary><b>📰 Today's news notes (parent)</b></summary><p class="sub">Type a headline or topic from today's news. Claude turns it into kid-friendly questions.</p><textarea id="nw" rows="3" style="width:100%;font:inherit;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:8px">${esc(S.news)}</textarea><input id="ch" placeholder="School chapters this month (optional)" value="${esc(S.chapters)}" style="width:100%;font:inherit;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink);padding:8px;margin-top:8px"><button class="main" id="gb">✨ Make fresh questions</button><p class="fb" id="gs">${(S.fresh||[]).length} fresh questions ready</p></details>
+ <p class="foot">${(S.missed||[]).length} to revisit later. <small>(app v3)</small> <button id="pv">Parent view</button><br>Levels adjust by themselves: Maths ${L('math')}, Logic ${L('logic')}, Memory ${L('mem')}.<br><button id="rs">Reset all progress</button></p>`;
+ app.querySelectorAll('.act').forEach(b=>b.onclick=()=>ACTS.find(a=>a.id==b.dataset.id).run());
+ $('#rs').onclick=()=>{if(confirm('Reset all progress?')){S={streak:0,last:'',stars:0,lv:{},done:{}};save();home()}};
+ $('#sw').onclick=picker;$('#pf').onclick=profile;$('#pv').onclick=dash;$('#gb').onclick=async()=>{S.news=$('#nw').value;S.chapters=$('#ch').value;save();$('#gs').textContent='Creating fresh questions…';const n=await gen();$('#gs').textContent=n?(S.fresh.length+' fresh questions ready ✨'):'Could not create new questions right now'+(window.LASTERR?' ('+window.LASTERR+')':'')+'. The built-in questions still work.'};
+ window.scrollTo(0,0)}
+
+function shell(t,body){VIEW='q';app.innerHTML=`<button class="back" id="bk">← Back</button><div class="panel"><h2>${t}</h2>${body}</div>`;$('#bk').onclick=home}
+
+function quiz(id,items,title,lv){let i=0,sc=0;
+ (function show(){if(i>=items.length)return finish(id,sc,items.length,lv,title);
+ const it=items[i];
+ shell(title,`<p class="prog">Question ${i+1} of ${items.length}</p><p class="q">${it.q}</p><div class="opts">${it.o.map((o,j)=>`<button class="o" data-j="${j}">${o}</button>`).join('')}</div><p class="fb" id="fb"></p><div id="nx"></div>`);
+ const bs=app.querySelectorAll('button.o');
+ bs.forEach(b=>b.onclick=()=>{const j=+b.dataset.j;bs.forEach(x=>x.disabled=true);bs[it.a].classList.add('right');
+  if(it.x)track(it,j==it.a);if(it.cat){S.stats=S.stats||{};S.log=S.log||{};const k=it.cat.replace(/ 🔁.*/,''),t=S.stats[k]=S.stats[k]||{r:0,w:0},lg=S.log[key]=S.log[key]||{r:0,w:0},c=j==it.a;t[c?'r':'w']++;lg[c?'r':'w']++}if(j==it.a){sc++;$('#fb').textContent='✅ Correct! '+it.e+(it.cat?'  Topic: '+it.cat:'')}else{b.classList.add('wrong');$('#fb').textContent='❌ Not quite. '+it.e+(it.cat?'  Topic: '+it.cat:'')}
+  $('#nx').innerHTML=(it.x?'<button class="back" id="rp">🚩 Report this question</button> ':'')+`<button class="main">${i+1<items.length?'Next question':'Finish'}</button>`;
+  $('#nx .main').onclick=()=>{i++;show()};const rp=$('#rp');if(rp)rp.onclick=()=>{S.bad=[...(S.bad||[]),it.x[0]].slice(-100);S.missed=(S.missed||[]).filter(m=>m.x[0]!=it.x[0]);rp.textContent='Thanks! Removed.';rp.disabled=true;save()}})})()}
+
+function finish(id,sc,tot,lv,title){if(id=='read'&&WP){const w=WP;WP=null;shell('Write it down ✍️','<p class="q">'+esc(w)+'</p><p>Write on paper, or say it out loud to a parent.</p><button class="main" id="wd">Done writing ✍️</button>');$('#wd').onclick=()=>finish(id,sc,tot,lv,title);return}S.done[key]=S.done[key]||{};
+ if(id!='rev'&&S.done[key][id]===undefined)S.stars+=sc;
+ if(id!='rev')S.done[key][id]=sc;let msg='';
+ if(lv&&!S.manual){const l=L(lv);if(sc==tot&&l<4){S.lv[lv]=l+1;msg='Level up! The next one will be harder. 🚀'}else if(sc<=tot/2&&l>1){S.lv[lv]=l-1;msg='We will make the next one a little easier. Practice makes it click.'}}
+ if(Object.keys(S.done[key]).length==ACTS.length&&S.last!==key){S.streak=S.last===yest?S.streak+1:1;S.last=key;msg+=' 🔥 Streak: '+S.streak+' days!'}
+ save();
+ shell(title||'Done',`<p class="big" style="letter-spacing:0">${sc}/${tot} ⭐</p><p>${sc==tot?'Perfect! Legend! 🏆':sc>=tot/2?'Great effort! Nice thinking! 🌟':'Good try! Every mistake grows your brain. 💪'} ${msg}</p>${id=='mix3'?'<p><b>Family talk:</b> '+TALK[DAY]+'</p>':''}<button class="main" id="hm">Back to today</button>`);
+ $('#hm').onclick=home}
+
+function memory(){const t=++tok,n=Math.min(8,4+L('mem')),pool=shuf(EM).slice(0,12),seen=pool.slice(0,n);let s=7;
+ shell('Memory flash',`<p>Remember these ${n} pictures.</p><div class="big">${seen.join(' ')}</div><p class="fb" id="cd"></p>`);
+ const iv=setInterval(()=>{if(t!==tok){clearInterval(iv);return}
+  $('#cd').textContent=`Hiding in ${s} seconds…`;if(s--<=0){clearInterval(iv);ask()}},1000);
+ function ask(){const sel=new Set();
+  shell('Which did you see?',`<p>Tap the ${n} pictures you saw.</p><div class="grid">${shuf(pool).map(e=>`<button class="o">${e}</button>`).join('')}</div><p class="fb" id="fb"></p>`);
+  app.querySelectorAll('.grid button').forEach(b=>b.onclick=()=>{const e=b.textContent;
+   if(sel.has(e)){sel.delete(e);b.classList.remove('sel')}else if(sel.size<n){sel.add(e);b.classList.add('sel')}
+   $('#fb').textContent=`${sel.size} of ${n} chosen`;
+   if(sel.size==n){const h=[...sel].filter(x=>seen.includes(x)).length;setTimeout(()=>finish('mem',h,n,'mem','Memory flash'),500)}})}}
+
+function offline(){const c=OFF[r(0,OFF.length-1)].replace(/^\w+day: /,'');
+ shell('Hands-on challenge',`<p class="q">${c}</p><p>Take about 5 minutes. A parent can join in and ask: "What did you notice?"</p><button class="main" id="dn">I did it!</button>`);
+ $('#dn').onclick=()=>finish('off',3,3,null,'Hands-on challenge')}
+
+const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}return null};
+const PR=()=>PF.find(p=>p.id==CUR)||{name:'',emoji:'🧠',grade:3,age:9};
+const savePF=()=>{LS('bqp',JSON.stringify(PF));if(DB)DB.doc('profiles/list').set({s:JSON.stringify(PF)}).catch(()=>{})};
+function loadPF(){try{PF=JSON.parse(LS('bqp')||'[]')}catch(e){PF=[]}const old=LS('bqd');if(!PF.length&&old){PF=[{id:'main',name:'My child',emoji:'🦁',grade:3,age:9}];LS('bqd_main',old);LS('bqp',JSON.stringify(PF))}}
+function picker(){VIEW='p';tok++;app.innerHTML=`<h1>Who is learning today?</h1><p class='sub'>Tap a name to start. Each child has their own progress.</p>${PF.map(p=>`<button class='act' data-id='${p.id}'><span class='ic'>${p.emoji}</span><span><b>${esc(p.name)}</b><small>Grade ${p.grade}</small></span></button><button class='back' data-ed='${p.id}' style='margin:-4px 0 10px'>✏️ Edit details</button>`).join('')}<button class='act' id='ad'><span class='ic'>➕</span><span><b>Add a child</b><small>Name, grade and avatar</small></span></button>`;
+app.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>selectChild(b.dataset.id));app.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>addForm(b.dataset.ed));$('#ad').onclick=()=>addForm()}
+function addForm(eid){VIEW='p';const P0=PF.find(x=>x.id==eid),E=['🦁','🐯','🦊','🐼','🚀','⚽','🦄','🐬'];let em=P0?P0.emoji:E[0];
+app.innerHTML=`<button class='back' id='bk'>← Back</button><h1>${P0?'Edit child':'Add a child'}</h1><input id='an' value='${P0?esc(P0.name).replace(/'/g,'&#39;'):''}' placeholder='Name' maxlength='20' style='width:100%;font:inherit;padding:10px;border-radius:12px;border:2px solid var(--line);background:var(--card);color:var(--ink)'><p class='sub'>Grade (CBSE)</p><select id='ag' style='font:inherit;padding:10px;border-radius:12px;width:100%'>${[1,2,3,4,5,6,7,8].map(g=>`<option ${g==(P0?P0.grade:3)?'selected':''}>${g}</option>`).join('')}</select><p class='sub'>Date of birth</p><input id='ad2' type='date' class='in' value='${P0&&P0.dob?P0.dob:''}'><p class='sub'>Pick an avatar</p><div class='grid' id='ae'>${E.map(e=>`<button class='o ${e==em?'sel':''}'>${e}</button>`).join('')}</div><button class='main' id='as'>Save</button>${P0?`<button class='back' id='rm' style='margin-top:12px'>Remove this child</button>`:''}`;
+$('#bk').onclick=picker;app.querySelectorAll('#ae button').forEach(b=>b.onclick=()=>{em=b.textContent;app.querySelectorAll('#ae button').forEach(x=>x.classList.toggle('sel',x==b))});
+$('#as').onclick=async()=>{const n=$('#an').value.trim();if(!n){$('#an').focus();return}const g=+$('#ag').value,dob=$('#ad2').value||null,ob={name:n,emoji:em,grade:g,age:g+6,dob};
+if(P0){Object.assign(P0,ob);if(sb&&USER)await sb.from('children').update({name:n,emoji:em,grade:g,dob}).eq('id',eid)}
+else if(sb&&USER){const r=await sb.from('children').insert({name:n,emoji:em,grade:g,dob}).select().single();if(r.error){alert(r.error.message);return}PF.push({id:r.data.id,...ob})}
+else PF.push({id:'c'+Date.now().toString(36),...ob});
+savePF();picker()};const rm=$('#rm');if(rm)rm.onclick=()=>{if(rm.dataset.c){PF=PF.filter(x=>x.id!=eid);LS('bqd_'+eid,'{}');if(sb&&USER)sb.from('children').delete().eq('id',eid).then(()=>{});savePF();picker()}else{rm.dataset.c=1;rm.textContent='Tap again to remove permanently'}}}
+function selectChild(id){CUR=id;LS('bqc',id);let r={};try{r=JSON.parse(LS('bqd_'+id)||'{}')}catch(e){}const pf=PF.find(p=>p.id==id);if(pf&&pf.remote&&(pf.remote.upd||0)>(r.upd||0))r=pf.remote;S=Object.assign({streak:0,last:'',stars:0,lv:{},done:{}},r);watch();home()}
+function watch(){if(unsub){try{unsub()}catch(e){}unsub=null}if(!DB||!CUR)return;const id=CUR;unsub=DB.doc('progress/'+id).onSnapshot(sn=>{if(id!=CUR)return;if(!sn.exists){save();return}let r;try{r=JSON.parse(sn.data().s)}catch(e){return}if((r.upd||0)>(S.upd||0)){S=Object.assign({streak:0,last:'',stars:0,lv:{},done:{}},r);LS('bqd_'+id,JSON.stringify(S));if(VIEW=='d')dash();else if(VIEW=='h')home()}else if((r.upd||0)<(S.upd||0))save()},()=>{})}
+loadPF();
+const BADGES=[['🌱','First steps',()=>Object.keys(S.done||{}).length>=1],['🔥','3-day streak',()=>(S.streak||0)>=3],['🔥','7-day streak',()=>(S.streak||0)>=7],['⭐','100 stars',()=>(S.stars||0)>=100],['🏆','500 stars',()=>(S.stars||0)>=500],['🧠','Memory master',()=>L('mem')>=4],['🥷','Number ninja',()=>L('math')>=3],['🧩','Puzzle pro',()=>L('logic')>=3],['🌍','Topic explorer',()=>Object.keys(S.stats||{}).length>=5],['💪','Comeback kid',()=>(S.fixed||0)>=5]];
+function profile(){VIEW='f';const p=PR(),u=(USER&&USER.user_metadata)||{},age=p.dob?Math.floor((Date.now()-new Date(p.dob))/315576e5):p.age;
+S.ach=S.ach||{};BADGES.forEach(b=>{if(b[2]()&&!S.ach[b[1]])S.ach[b[1]]=key});save();
+const lv=(k,t)=>`<p style='display:flex;align-items:center;gap:8px;margin:8px 0'><b style='flex:1'>${t}</b><button class='back' data-lv='${k}' data-d='-1'>−</button> Level ${L(k)} <button class='back' data-lv='${k}' data-d='1'>+</button></p>`;
+app.innerHTML=`<button class='back' id='bk'>← Back</button><h1>${p.emoji} ${esc(p.name)}</h1><p class='sub'>Grade ${p.grade}${age?' · Age '+age:''}</p>
+<div class='stats'><div class='stat'><b>🔥 ${S.streak||0}</b><span>streak</span></div><div class='stat'><b>⭐ ${S.stars||0}</b><span>stars</span></div><div class='stat'><b>${Object.keys(S.log||{}).length}</b><span>days played</span></div></div>
+<div class='panel'><b>🏅 Achievements</b>${BADGES.map(b=>S.ach[b[1]]?`<p style='margin:6px 0'>${b[0]} ${b[1]} <small>(${S.ach[b[1]]})</small></p>`:`<p style='margin:6px 0;opacity:.5'>🔒 ${b[1]}</p>`).join('')}</div>
+<div class='panel mt'><b>Difficulty</b><p><label><input type='checkbox' id='mn' ${S.manual?'checked':''}> Keep my levels (turn off auto-adjust)</label></p>${lv('math','Maths')}${lv('logic','Puzzles')}${lv('mem','Memory')}<small>Changes apply to the next round straight away.</small></div>
+<button class='main' id='rv'>🔁 Review mistakes (${(S.missed||[]).length})</button>
+${USER?`<div class='panel mt'><b>Parent account</b><p>${esc(u.name||'')}<br>${esc(USER.email)}<br>${esc(u.phone||'')}</p><button class='back' id='lo'>Log out</button></div>`:''}`;
+$('#bk').onclick=home;$('#rv').onclick=review;
+$('#mn').onchange=e=>{S.manual=e.target.checked;save()};
+app.querySelectorAll('[data-lv]').forEach(b=>b.onclick=()=>{const k=b.dataset.lv;S.lv[k]=Math.min(4,Math.max(1,L(k)+(+b.dataset.d)));S.manual=true;save();profile()});
+const lo=$('#lo');if(lo)lo.onclick=async()=>{await sb.auth.signOut();USER=null;PF=[];CUR=null;authScreen('in')}}
+function review(){VIEW='r';const m=S.missed||[];app.innerHTML=`<button class='back' id='bk'>← Back</button><h2>Review mistakes</h2>${m.length?m.map(x=>`<div class='panel mt'><small>${esc(x.cat||'')}</small><p style='margin:4px 0'>${esc(x.x[0].replace(/<[^>]*>/g,' '))}</p><b style='color:var(--ok)'>${esc(x.x[1])}</b><br><small>${esc(x.x[3]||'')}</small></div>`).join(''):'<p class="sub">No mistakes waiting. 🎉</p>'}${m.length?`<button class='main' id='pr'>Practise these now</button>`:''}`;
+$('#bk').onclick=profile;if(m.length)$('#pr').onclick=()=>quiz('rev',m.slice(0,8).map(x=>toQ({x:x.x,cat:x.cat,retry:true})),'Review mistakes')}
+function authScreen(mode){VIEW='a';const su=mode=='up';
+app.innerHTML=`<h1>🧠 Brain Quest</h1><p class='sub'>${su?'Create a parent account':'Welcome back! Log in to continue.'}</p>${su?`<input class='in' id='pn' placeholder='Parent name'><p class='sub' style='margin:4px 0'>Date of birth</p><input class='in' id='pd' type='date'><input class='in' id='pp' type='tel' placeholder='Contact number'>`:''}<input class='in' id='pe' type='email' placeholder='Email'><input class='in' id='pw' type='password' placeholder='Password (6+ characters)'><button class='main' id='go'>${su?'Create account':'Log in'}</button><p class='fb' id='ae'></p><button class='back' id='tg'>${su?'I already have an account':'New here? Create an account'}</button>`;
+$('#tg').onclick=()=>authScreen(su?'in':'up');
+$('#go').onclick=async()=>{const m=$('#ae');m.textContent='Please wait…';const e=$('#pe').value.trim(),p=$('#pw').value;
+const r=su?await sb.auth.signUp({email:e,password:p,options:{data:{name:$('#pn').value.trim(),dob:$('#pd').value,phone:$('#pp').value.trim()}}}):await sb.auth.signInWithPassword({email:e,password:p});
+if(r.error){m.textContent=r.error.message;return}if(!r.data.session){m.textContent='Check your email to confirm your address, then log in.';return}USER=r.data.user;afterLogin()}}
+async function afterLogin(){const r=await sb.from('children').select('*').order('created_at');PF=(r.data||[]).map(c=>({id:c.id,name:c.name,emoji:c.emoji||'🦁',grade:c.grade||3,age:(c.grade||3)+6,dob:c.dob,remote:c.data}));LS('bqp',JSON.stringify(PF));picker()}
+if(sb)sb.auth.getSession().then(r=>{if(r.data.session){USER=r.data.session.user;afterLogin()}else authScreen('in')});else picker();
+(async()=>{try{if(!window.claude)return;const d=await claude.use('db');if(!d)return;DB=d;watch();
+d.doc('profiles/list').onSnapshot(async sn=>{let r=null;if(sn.exists){try{r=JSON.parse(sn.data().s)}catch(e){}}
+if(r&&r.length){const m=[...r];PF.forEach(p=>{if(!m.find(x=>x.id==p.id))m.push(p)});const grew=m.length>r.length;PF=m;LS('bqp',JSON.stringify(PF));if(grew)savePF()}
+else if(!PF.length){const m=await d.doc('progress/main').get();if(m.exists){PF=[{id:'main',name:'My child',emoji:'🦁',grade:3,age:9}];savePF()}}else savePF();
+if(VIEW=='p')picker()},()=>{})}catch(e){}})();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script></body></html>
