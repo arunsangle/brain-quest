@@ -4,7 +4,7 @@ const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-const DAILY_LIMIT = 5, GLOBAL_LIMIT = 30 // question-making calls per parent per day (protects your API bill)
+const DAILY_LIMIT = 10, GLOBAL_LIMIT = 40 // question-making calls per parent per day (protects your API bill)
 const reply = (o: unknown, s = 200) =>
   new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } })
 
@@ -16,22 +16,25 @@ Deno.serve(async (req) => {
     const { data: u } = await admin.auth.getUser(token)
     if (!u?.user) return reply({ error: 'login required' }, 401)
 
+    const b = await req.json().catch(() => ({}))
     const today = new Date().toISOString().slice(0, 10)
-    const { count } = await admin.from('usage').select('id', { count: 'exact', head: true })
-      .eq('user_id', u.user.id).eq('day', today)
-    if ((count ?? 0) >= DAILY_LIMIT) return reply({ error: 'daily limit reached', items: [] })
-    const { count: all } = await admin.from('usage').select('id', { count: 'exact', head: true }).eq('day', today)
-    if ((all ?? 0) >= GLOBAL_LIMIT) return reply({ error: 'daily free limit reached, try tomorrow', items: [] })
-    await admin.from('usage').insert({ user_id: u.user.id })
+    if (!b.test) {
+      const { count } = await admin.from('usage').select('id', { count: 'exact', head: true })
+        .eq('user_id', u.user.id).eq('day', today)
+      if ((count ?? 0) >= DAILY_LIMIT) return reply({ error: 'daily limit reached', items: [] })
+      const { count: all } = await admin.from('usage').select('id', { count: 'exact', head: true }).eq('day', today)
+      if ((all ?? 0) >= GLOBAL_LIMIT) return reply({ error: 'daily free limit reached, try tomorrow', items: [] })
+      await admin.from('usage').insert({ user_id: u.user.id })
 
-    const b = await req.json()
+
+    }
     const prompt =
       'You write quiz questions for a curious ' + (b.age || 9) + '-year-old (CBSE Grade ' + (b.grade || 3) +
       ', lives in Abu Dhabi, Indian family). Create 8 multiple-choice questions, randomly mixing: Hindu epics and mythology, ' +
       'Indian history (Shivaji Maharaj and the Marathas, Mughals, British era, freedom struggle), other religions (informative, neutral), ' +
       'world geography and geopolitics, economics and finance, AI and technology, health and medicine, space and science, sports, nature, ' +
       'the UAE, logic riddles, English words and grammar, Arabic words, simple Hindi words. ' +
-      'Include 4 questions on recent world events (use web search if available; only facts you can confirm; neutral, non-graphic, never taking sides). ' +
+      'Include a few questions on school Maths, Science, English grammar, Arabic and money skills suited to the grade. Include 4 questions on recent world events (use web search if available; only facts you can confirm; neutral, non-graphic, never taking sides). ' +
       (b.news ? 'The parent says this is in the news: ' + JSON.stringify(b.news) + '. Make 4 questions from it. ' : '') +
       (b.chapters ? 'School topics this month: ' + b.chapters + '. Include 3 questions on these. ' : '') +
       (b.weak?.length ? 'Make these topics easier: ' + b.weak.join(', ') + '. ' : '') +
@@ -40,6 +43,9 @@ Deno.serve(async (req) => {
       'Do not repeat: ' + (b.recent || []).join(' | ') + '. ' +
       'Return ONLY a JSON array of objects: {"q":"","c":"correct answer","w":["wrong1","wrong2","wrong3"],"e":"one fun sentence explaining","cat":"emoji and topic, e.g. \ud83c\udf10 World"}'
 
+    let prompt2 = prompt
+    if (b.test) prompt2 = 'Return ONLY this JSON: [{"q":"2 + 2 = ?","c":"4","w":["3","5","6"],"e":"Two plus two is four.","cat":"Maths"}]'
+    if (b.mode === 'lesson') prompt2 = 'You are a friendly tutor for a CBSE Grade ' + (b.grade || 3) + ' student (age ' + (b.age || 9) + ') in Abu Dhabi. Subject: ' + b.subject + '. Lesson: ' + JSON.stringify(b.topic) + '. Notes: ' + JSON.stringify(String(b.notes || '').slice(0, 500)) + '. Create 6 NEW multiple-choice practice questions on exactly this lesson, easy to medium, simple wording, exactly one correct answer, answers under 8 words, plausible wrong options, double-check every answer. Return ONLY a JSON array of objects: {"q":"","c":"correct answer","w":["wrong1","wrong2","wrong3"],"e":"one short explanation","cat":"emoji and subject"}'
     // OpenRouter: discover which free models exist right now, then try a few in order.
     const KEY = Deno.env.get('OPENROUTER_API_KEY')!
     let free: string[] = []
@@ -64,7 +70,7 @@ Deno.serve(async (req) => {
         const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST', signal: ac.signal,
           headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://arunsangle.github.io/brain-quest/', 'X-Title': 'Brain Quest' },
-          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 2500 }),
+          body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt2 }], temperature: 0.7, max_tokens: 2500 }),
         })
         if (!r.ok) { const t = await r.text(); if (!firstBody) firstBody = t.replace(/\s+/g, ' ').slice(0, 110); throw new Error(model.split('/').pop()!.slice(0, 22) + ' ' + r.status) }
         const j = await r.json()
@@ -73,12 +79,14 @@ Deno.serve(async (req) => {
       } finally { clearTimeout(to) }
     }
     let arr: any[] | null = null
+    let used = ''
     for (const m of MODELS) {
-      try { arr = await ask(m); break } catch (e) { errs.push(String(e).replace('Error: ', '').slice(0, 40)); console.error('failed:', String(e)) }
+      try { arr = await ask(m); used = m; break } catch (e) { errs.push(String(e).replace('Error: ', '').slice(0, 40)); console.error('failed:', String(e)) }
     }
     if (!arr) throw new Error('listed ' + free.length + ' free models. tried ' + errs.join(', ') + '. first: ' + firstBody)
     const rows = arr.filter((o: any) => o.q && o.c && Array.isArray(o.w) && o.w.length >= 3 && o.e)
       .map((o: any) => ({ q: o.q, c: o.c, w: o.w.slice(0, 3), e: o.e, cat: o.cat || null, grade: b.grade || 3 }))
+    if (b.test) return reply({ ok: true, model: used, listed: free.length, items: [] })
     if (!rows.length) return reply({ error: 'no valid questions returned by the model', items: [] })
     if (rows.length) await admin.from('questions').upsert(rows, { onConflict: 'q', ignoreDuplicates: true })
     return reply({ items: rows })
